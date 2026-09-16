@@ -23,7 +23,7 @@ async function checkApi() {
   } else if (provider === "openai_compatible") {
     apiStatus.textContent = `Connected · AI${model ? ` (${model})` : ""}`;
   } else {
-    apiStatus.textContent = "Connected · AI off";
+    apiStatus.textContent = "Connected · Gemini key needed";
   }
   apiStatus.className = "pill ok";
 }
@@ -121,11 +121,11 @@ analyzeButton.addEventListener("click", async () => {
     const parts = [`${summary.filled} verified fact field(s) filled on this ${detected}.`];
 
     if (aiDrafts?.drafted) {
-      parts.push(`${aiDrafts.drafted} narrative answer(s) were drafted by AI and inserted for review.`);
+      parts.push(`${aiDrafts.drafted} narrative answer(s) were drafted by Gemini and inserted for review.`);
     } else if (aiDrafts?.not_configured) {
-      parts.push("AI drafting is off. Add GEMINI_API_KEY to apps/api/.env and restart the API.");
+      parts.push("Gemini is not configured. Open Edit My Profile, paste your Gemini API key, click Save AI settings, then Test Gemini.");
     } else if (aiDrafts && !aiDrafts.ok) {
-      parts.push(`AI drafting could not run: ${aiDrafts.error}`);
+      parts.push(`Gemini drafting could not run: ${aiDrafts.error}`);
     }
 
     if (aiDrafts?.needs_input) {
