@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FiFo AI",
   "description": "AI-assisted job and application form autofill with review-first safety.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "permissions": ["storage", "activeTab", "tabs", "webNavigation"],
   "host_permissions": [
     "http://localhost:8000/*"
@@ -19,7 +19,7 @@
     {
       "matches": ["http://*/*", "https://*/*"],
       "exclude_matches": ["http://localhost:8000/*"],
-      "js": ["content.js"],
+      "js": ["content.js", "ai_fill.js"],
       "run_at": "document_idle",
       "all_frames": true,
       "match_about_blank": true
