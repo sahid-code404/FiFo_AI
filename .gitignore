@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Local data / secrets
+.env
+*.db
+*.sqlite
+*.sqlite3
+apps/api/data/
+
+# Node/editor
+node_modules/
+.vscode/
+.idea/
+.DS_Store
+
+# Extension packages
+*.zip
+*.crx
