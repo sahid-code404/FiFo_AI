@@ -1,11 +1,15 @@
 const DEFAULT_API_URL = "http://localhost:8000";
 
 const factFields = [
-  "name", "email", "phone", "college", "degree", "stream", "passing_year", "cgpa",
-  "class_x_percentage", "class_xii_percentage", "current_location", "joining_date"
+  "name", "first_name", "middle_name", "last_name", "email", "phone", "date_of_birth", "gender",
+  "nationality", "address", "city", "state", "country", "postal_code", "current_location",
+  "college", "degree", "stream", "passing_year", "semester", "cgpa",
+  "class_x_percentage", "class_x_board", "class_x_year",
+  "class_xii_percentage", "class_xii_board", "class_xii_year",
+  "joining_date", "notice_period"
 ];
 const preferenceFields = ["preferred_city"];
-const linkFields = ["github", "linkedin"];
+const linkFields = ["github", "linkedin", "portfolio"];
 
 function byId(id) {
   return document.getElementById(id);
@@ -29,6 +33,33 @@ function setValue(id, value) {
   if (element) element.value = value ?? "";
 }
 
+function answerBankToText(bank) {
+  if (!Array.isArray(bank)) return "";
+  return bank
+    .filter((item) => item && item.value && Array.isArray(item.aliases) && item.aliases.length)
+    .map((item) => `${item.aliases.join(" / ")} = ${item.value}`)
+    .join("\n");
+}
+
+function parseAnswerBank(text) {
+  return String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const separator = line.indexOf("=");
+      if (separator < 1) return null;
+      const aliases = line.slice(0, separator)
+        .split("/")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      const value = line.slice(separator + 1).trim();
+      if (!aliases.length || !value) return null;
+      return { aliases, value, auto_fill: true };
+    })
+    .filter(Boolean);
+}
+
 function fillProfile(profile) {
   const facts = profile.facts || {};
   const preferences = profile.preferences || {};
@@ -38,24 +69,31 @@ function fillProfile(profile) {
   linkFields.forEach((field) => setValue(field, links[field] ?? profile[field]));
   setValue("skills", (profile.skills || []).join(", "));
   setValue("projects", profile.projects || "");
+  setValue("answer_bank", answerBankToText(profile.answer_bank));
 }
 
-function collectProfile() {
-  const facts = Object.fromEntries(factFields.map((field) => [field, byId(field).value.trim()]));
-  const preferences = Object.fromEntries(preferenceFields.map((field) => [field, byId(field).value.trim()]));
-  const links = Object.fromEntries(linkFields.map((field) => [field, byId(field).value.trim()]));
+function collectProfile(existing = {}) {
+  const facts = Object.fromEntries(factFields.map((field) => [field, byId(field)?.value.trim() || ""]));
+  const preferences = Object.fromEntries(preferenceFields.map((field) => [field, byId(field)?.value.trim() || ""]));
+  const links = Object.fromEntries(linkFields.map((field) => [field, byId(field)?.value.trim() || ""]));
   const skills = byId("skills").value.split(",").map((item) => item.trim()).filter(Boolean);
   const projects = byId("projects").value.trim();
-  return { facts, preferences, links, skills, projects };
+  const answer_bank = parseAnswerBank(byId("answer_bank").value);
+
+  // Preserve future/unknown top-level keys so upgrading the extension does not
+  // accidentally erase data created by newer API versions.
+  return { ...existing, facts, preferences, links, skills, projects, answer_bank };
 }
+
+let loadedProfile = {};
 
 async function load() {
   const stored = await chrome.storage.sync.get(["apiUrl"]);
   byId("apiUrl").value = stored.apiUrl || DEFAULT_API_URL;
 
   try {
-    const profile = await api("/profile");
-    fillProfile(profile || {});
+    loadedProfile = await api("/profile") || {};
+    fillProfile(loadedProfile);
     byId("connectionStatus").textContent = "Connected";
   } catch (error) {
     byId("connectionStatus").textContent = `Offline: ${error.message}`;
@@ -77,10 +115,11 @@ byId("saveConnection").addEventListener("click", async () => {
 byId("saveProfile").addEventListener("click", async () => {
   byId("saveStatus").textContent = "Saving…";
   try {
-    await api("/profile", {
+    const payload = collectProfile(loadedProfile);
+    loadedProfile = await api("/profile", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(collectProfile())
+      body: JSON.stringify(payload)
     });
     byId("saveStatus").textContent = "Profile saved";
   } catch (error) {
