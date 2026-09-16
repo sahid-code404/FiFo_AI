@@ -99,7 +99,6 @@ function labelForGroup(container, fallbackControl) {
   )?.textContent?.trim();
   if (heading) parts.push(heading);
 
-  // Some ATS pages put the prompt in a plain label immediately before the controls.
   const firstLabel = container.querySelector?.("label")?.textContent?.trim();
   if (firstLabel) parts.push(firstLabel);
 
@@ -287,27 +286,115 @@ function optionTextForInput(input) {
   return input.closest("label")?.textContent?.trim() || input.value || "";
 }
 
-function choiceEquals(option, value) {
+const CHOICE_TOKEN_EXPANSIONS = {
+  cse: "computer science engineering",
+  cs: "computer science",
+  it: "information technology",
+  aiml: "artificial intelligence machine learning",
+  ai: "artificial intelligence",
+  ml: "machine learning",
+  ece: "electronics communication engineering",
+  ee: "electrical engineering",
+  eee: "electrical electronics engineering",
+  me: "mechanical engineering",
+  mech: "mechanical engineering",
+  btech: "bachelor technology",
+  bsc: "bachelor science",
+  mtech: "master technology",
+  msc: "master science"
+};
+
+const CHOICE_STOP_WORDS = new Set(["and", "or", "of", "in", "the", "a", "an", "for", "with"]);
+
+function expandedChoice(value) {
+  const parts = normalize(value).split(" ").filter(Boolean);
+  const expanded = [];
+  for (const part of parts) {
+    const replacement = CHOICE_TOKEN_EXPANSIONS[part];
+    if (replacement) expanded.push(...replacement.split(" "));
+    else expanded.push(part);
+  }
+  return normalize(expanded.join(" "));
+}
+
+function choiceTokenSet(value) {
+  return new Set(expandedChoice(value).split(" ").filter((token) => token && !CHOICE_STOP_WORDS.has(token)));
+}
+
+function choiceAcronym(value) {
+  return expandedChoice(value)
+    .split(" ")
+    .filter((token) => token && !CHOICE_STOP_WORDS.has(token))
+    .map((token) => token[0])
+    .join("");
+}
+
+function choiceScore(option, value) {
   const a = normalize(option);
   const b = normalize(value);
-  if (!a || !b) return false;
-  if (a === b || a.includes(b) || b.includes(a)) return true;
-  return a.replace(/\s+/g, "") === b.replace(/\s+/g, "");
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.includes(b) || b.includes(a)) return 0.97;
+  if (a.replace(/\s+/g, "") === b.replace(/\s+/g, "")) return 0.96;
+
+  const expandedA = expandedChoice(option);
+  const expandedB = expandedChoice(value);
+  if (expandedA === expandedB) return 0.96;
+  if (expandedA.includes(expandedB) || expandedB.includes(expandedA)) return 0.92;
+
+  const aTokens = choiceTokenSet(option);
+  const bTokens = choiceTokenSet(value);
+  if (aTokens.size && bTokens.size) {
+    let common = 0;
+    for (const token of aTokens) if (bTokens.has(token)) common += 1;
+    const shorterCoverage = common / Math.min(aTokens.size, bTokens.size);
+    const longerCoverage = common / Math.max(aTokens.size, bTokens.size);
+    if (shorterCoverage === 1 && longerCoverage >= 0.5) return 0.90;
+    if (shorterCoverage >= 0.75 && longerCoverage >= 0.5) return 0.82;
+  }
+
+  const acronymA = choiceAcronym(option);
+  const acronymB = choiceAcronym(value);
+  const compactA = a.replace(/\s+/g, "");
+  const compactB = b.replace(/\s+/g, "");
+  if (acronymA && (acronymA === compactB || acronymA === acronymB)) return 0.86;
+  if (acronymB && acronymB === compactA) return 0.86;
+
+  return 0;
+}
+
+function choiceEquals(option, value) {
+  return choiceScore(option, value) >= 0.80;
+}
+
+function bestMatchingNode(nodes, textForNode, value) {
+  let best = null;
+  let bestScore = 0;
+  for (const node of nodes) {
+    const score = choiceScore(textForNode(node), value);
+    if (score > bestScore) {
+      best = node;
+      bestScore = score;
+    }
+  }
+  return bestScore >= 0.80 ? best : null;
 }
 
 function fillChoice(block, value) {
   const ariaChoices = [...block.querySelectorAll?.("[role='radio'], [role='checkbox']") || []];
   const nativeChoices = [...block.querySelectorAll?.("input[type='radio'], input[type='checkbox']") || []];
 
-  const ariaMatch = ariaChoices.find((choice) =>
-    choiceEquals(choice.textContent || choice.getAttribute("data-value") || choice.getAttribute("aria-label") || "", value)
+  const ariaMatch = bestMatchingNode(
+    ariaChoices,
+    (choice) => choice.textContent || choice.getAttribute("data-value") || choice.getAttribute("aria-label") || "",
+    value
   );
   if (ariaMatch) {
     ariaMatch.click();
     return true;
   }
 
-  const nativeMatch = nativeChoices.find((choice) => choiceEquals(optionTextForInput(choice), value));
+  const nativeMatch = bestMatchingNode(nativeChoices, optionTextForInput, value);
   if (nativeMatch) {
     nativeMatch.click();
     return true;
@@ -318,7 +405,11 @@ function fillChoice(block, value) {
 function fillNativeSelect(block, value) {
   const select = block.matches?.("select") ? block : block.querySelector?.("select");
   if (!select) return false;
-  const option = [...select.options].find((candidate) => choiceEquals(candidate.textContent || candidate.value, value));
+  const option = bestMatchingNode(
+    [...select.options],
+    (candidate) => candidate.textContent || candidate.value,
+    value
+  );
   if (!option) return false;
   select.value = option.value;
   select.dispatchEvent(new Event("input", { bubbles: true }));
@@ -333,12 +424,14 @@ async function fillAriaSelect(block, value) {
   if (!trigger) return false;
 
   trigger.click();
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 180));
 
   const options = [...document.querySelectorAll("[role='option']")]
     .filter((option) => option.getAttribute("aria-disabled") !== "true");
-  const match = options.find((option) =>
-    choiceEquals(option.textContent || option.getAttribute("data-value") || option.getAttribute("aria-label") || "", value)
+  const match = bestMatchingNode(
+    options,
+    (option) => option.textContent || option.getAttribute("data-value") || option.getAttribute("aria-label") || "",
+    value
   );
   if (!match) {
     document.body.click();
