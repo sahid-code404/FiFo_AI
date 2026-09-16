@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from pypdf import PdfReader
@@ -17,6 +17,7 @@ from .llm import (
     generate_answer,
     generate_answers,
     provider_status,
+    test_provider,
 )
 from .matching import best_match, canonical_fields, result_for_key
 from .storage import create_application, get_profile, init_db, list_applications, save_profile
@@ -68,7 +69,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="FiFo AI API", version="0.4.0", lifespan=lifespan)
+app = FastAPI(title="FiFo AI API", version="0.5.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -78,21 +79,57 @@ app.add_middleware(
 )
 
 
+def _ai_args(
+    key: str | None,
+    model: str | None,
+) -> tuple[str | None, str | None]:
+    clean_key = (key or "").strip() or None
+    clean_model = (model or "").strip() or None
+    return clean_key, clean_model
+
+
 @app.get("/health")
-def health() -> dict[str, Any]:
-    ai = provider_status()
+def health(
+    x_fifo_gemini_key: str | None = Header(default=None),
+    x_fifo_gemini_model: str | None = Header(default=None),
+) -> dict[str, Any]:
+    key, model = _ai_args(x_fifo_gemini_key, x_fifo_gemini_model)
+    ai = provider_status(key, model)
     return {
         "status": "ok",
-        "version": "0.4.0",
+        "version": "0.5.0",
         "semantic_ai": ai["configured"],
         "ai_provider": ai["provider"],
         "ai_model": ai["model"],
+        "ai_key_source": ai["key_source"],
     }
 
 
 @app.get("/ai/status")
-def ai_status() -> dict[str, Any]:
-    return provider_status()
+def ai_status(
+    x_fifo_gemini_key: str | None = Header(default=None),
+    x_fifo_gemini_model: str | None = Header(default=None),
+) -> dict[str, Any]:
+    key, model = _ai_args(x_fifo_gemini_key, x_fifo_gemini_model)
+    return provider_status(key, model)
+
+
+@app.post("/ai/test")
+async def ai_test(
+    x_fifo_gemini_key: str | None = Header(default=None),
+    x_fifo_gemini_model: str | None = Header(default=None),
+) -> dict[str, Any]:
+    key, model = _ai_args(x_fifo_gemini_key, x_fifo_gemini_model)
+    if not llm_configured(key):
+        return {"ok": False, **provider_status(key, model), "error": "AI is not configured"}
+    try:
+        return await test_provider(key, model)
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code if exc.response is not None else 502
+        detail = "Gemini rejected the request. Check the API key, model, quota, and API access."
+        raise HTTPException(status_code=status if status < 500 else 502, detail=detail) from exc
+    except (httpx.HTTPError, KeyError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="AI provider connection test failed") from exc
 
 
 @app.get("/profile")
@@ -121,8 +158,6 @@ async def import_resume(file: UploadFile = File(...)) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="Could not parse PDF") from exc
 
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
-    # Keep enough local resume context for grounded application answers while
-    # preventing accidental huge prompts from malformed PDFs.
     resume_text = text[:30000]
 
     email_match = re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", text, re.I)
@@ -145,7 +180,12 @@ async def import_resume(file: UploadFile = File(...)) -> dict[str, Any]:
 
 
 @app.post("/match-fields")
-async def match_fields(request: MatchRequest) -> dict[str, Any]:
+async def match_fields(
+    request: MatchRequest,
+    x_fifo_gemini_key: str | None = Header(default=None),
+    x_fifo_gemini_model: str | None = Header(default=None),
+) -> dict[str, Any]:
+    key, model = _ai_args(x_fifo_gemini_key, x_fifo_gemini_model)
     profile = get_profile()
     indexed: dict[str, dict[str, Any]] = {}
     unknown_for_ai: list[dict[str, Any]] = []
@@ -157,9 +197,14 @@ async def match_fields(request: MatchRequest) -> dict[str, Any]:
             unknown_for_ai.append(field.model_dump())
 
     ai_used = False
-    if unknown_for_ai and llm_configured():
+    if unknown_for_ai and llm_configured(key):
         try:
-            semantic = await classify_fields(unknown_for_ai, canonical_fields())
+            semantic = await classify_fields(
+                unknown_for_ai,
+                canonical_fields(),
+                gemini_api_key=key,
+                gemini_model=model,
+            )
             ai_used = True
         except (RuntimeError, httpx.HTTPError, KeyError, ValueError):
             semantic = {}
@@ -171,9 +216,9 @@ async def match_fields(request: MatchRequest) -> dict[str, Any]:
             confidence = float(match.get("confidence", 0.0))
             if confidence < 0.85:
                 continue
-            key = str(match.get("key") or "")
+            canonical_key = str(match.get("key") or "")
             semantic_result = result_for_key(
-                key,
+                canonical_key,
                 profile,
                 confidence,
                 reason="ai_semantic_field_match",
@@ -188,18 +233,29 @@ async def match_fields(request: MatchRequest) -> dict[str, Any]:
     results = [indexed[field.id] for field in request.fields]
     return {
         "results": results,
-        "semantic_ai": {"configured": llm_configured(), "used": ai_used},
+        "semantic_ai": {
+            "configured": llm_configured(key),
+            "used": ai_used,
+            "provider": provider_status(key, model)["provider"],
+        },
     }
 
 
 @app.post("/generate-answer")
-async def answer_generate(request: GenerateRequest) -> dict[str, Any]:
+async def answer_generate(
+    request: GenerateRequest,
+    x_fifo_gemini_key: str | None = Header(default=None),
+    x_fifo_gemini_model: str | None = Header(default=None),
+) -> dict[str, Any]:
+    key, model = _ai_args(x_fifo_gemini_key, x_fifo_gemini_model)
     try:
         answer = await generate_answer(
             request.question,
             get_profile(),
             request.max_words,
             context=request.context,
+            gemini_api_key=key,
+            gemini_model=model,
         )
     except RuntimeError:
         return {"status": "not_configured", "answer": None}
@@ -212,18 +268,25 @@ async def answer_generate(request: GenerateRequest) -> dict[str, Any]:
 
 
 @app.post("/generate-answers")
-async def answers_generate(request: GenerateBatchRequest) -> dict[str, Any]:
-    if not llm_configured():
+async def answers_generate(
+    request: GenerateBatchRequest,
+    x_fifo_gemini_key: str | None = Header(default=None),
+    x_fifo_gemini_model: str | None = Header(default=None),
+) -> dict[str, Any]:
+    key, model = _ai_args(x_fifo_gemini_key, x_fifo_gemini_model)
+    if not llm_configured(key):
         return {"status": "not_configured", "answers": []}
     try:
         answers = await generate_answers(
             [item.model_dump() for item in request.fields],
             get_profile(),
             context=request.context,
+            gemini_api_key=key,
+            gemini_model=model,
         )
     except (RuntimeError, httpx.HTTPError, KeyError, ValueError) as exc:
         raise HTTPException(status_code=502, detail="AI provider request failed") from exc
-    return {"status": "ok", "answers": answers, "provider": provider_status()}
+    return {"status": "ok", "answers": answers, "provider": provider_status(key, model)}
 
 
 @app.get("/applications")
