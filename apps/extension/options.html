@@ -72,11 +72,22 @@
     </section>
 
     <section class="panel">
-      <h2>Job preferences & links</h2>
+      <h2>Employment & availability</h2>
+      <p>Useful for internship, fresher and experienced-hire forms. Leave fields empty when they do not apply.</p>
       <div class="form-grid">
-        <label>Preferred city / work location<input id="preferred_city" /></label>
-        <label>Earliest joining date<input id="joining_date" type="date" /></label>
+        <label>Current employer / company<input id="current_employer" /></label>
+        <label>Current job title / designation<input id="current_job_title" /></label>
+        <label>Total years of experience<input id="years_experience" placeholder="0 / Fresher / 2.5" /></label>
         <label>Notice period<input id="notice_period" placeholder="Immediate / 30 days" /></label>
+        <label>Earliest joining date<input id="joining_date" type="date" /></label>
+        <label>Preferred work mode<input id="work_mode" placeholder="On-site / Hybrid / Remote" /></label>
+        <label>Preferred city / work location<input id="preferred_city" /></label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Links & application context</h2>
+      <div class="form-grid">
         <label>GitHub<input id="github" placeholder="https://github.com/..." /></label>
         <label>LinkedIn<input id="linkedin" placeholder="https://www.linkedin.com/in/..." /></label>
         <label>Portfolio / personal website<input id="portfolio" placeholder="https://..." /></label>
@@ -93,7 +104,7 @@
       <h2>Reusable answers</h2>
       <p>For recurring questions not covered above, save equivalent question wordings once. Format each line as <strong>wording 1 / wording 2 = answer</strong>. FiFo will reuse it only when the match is strong. Sensitive declarations still require review.</p>
       <label class="wide">Answer bank
-        <textarea id="answer_bank" rows="8" placeholder="Current semester / semester = 7&#10;University roll number / enrollment number = YOUR_VALUE&#10;Preferred work mode / work arrangement = Hybrid"></textarea>
+        <textarea id="answer_bank" rows="8" placeholder="University roll number / enrollment number = YOUR_VALUE&#10;Preferred shift / shift preference = Day shift&#10;How did you hear about us / source = University placement cell"></textarea>
       </label>
     </section>
 
