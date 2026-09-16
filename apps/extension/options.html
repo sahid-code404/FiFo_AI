@@ -12,7 +12,7 @@
       <div class="logo">F</div>
       <div>
         <h1>FiFo AI Profile</h1>
-        <p>Store facts once. FiFo AI maps different company wording back to the same saved answers.</p>
+        <p>Store facts once. FiFo maps different company wording to the same answers and uses verified context for AI drafts.</p>
       </div>
     </header>
 
@@ -86,7 +86,7 @@
     </section>
 
     <section class="panel">
-      <h2>Links & application context</h2>
+      <h2>Links</h2>
       <div class="form-grid">
         <label>GitHub<input id="github" placeholder="https://github.com/..." /></label>
         <label>LinkedIn<input id="linkedin" placeholder="https://www.linkedin.com/in/..." /></label>
@@ -95,14 +95,31 @@
       <label class="wide">Skills (comma separated)
         <textarea id="skills" rows="3" placeholder="Python, FastAPI, React, robotics..."></textarea>
       </label>
-      <label class="wide">Projects / experience notes
-        <textarea id="projects" rows="7" placeholder="Add concise verified facts the AI may use when drafting application answers."></textarea>
+    </section>
+
+    <section class="panel">
+      <h2>AI answer knowledge</h2>
+      <p>Gemini uses only these saved details and your resume for applicant-specific answers such as 200-word notes, project descriptions, motivation and experience questions.</p>
+      <label class="wide">Projects
+        <textarea id="projects" rows="6" placeholder="Project name, what you built, your role, technologies, result, and what you learned."></textarea>
+      </label>
+      <label class="wide">Experience / internships / responsibilities
+        <textarea id="experience" rows="6" placeholder="Verified internship, work, team, leadership or volunteer experience."></textarea>
+      </label>
+      <label class="wide">Achievements / certifications
+        <textarea id="achievements" rows="4" placeholder="Awards, hackathons, certifications and achievements you can verify."></textarea>
+      </label>
+      <label class="wide">Career interests / goals
+        <textarea id="career_goals" rows="4" placeholder="Roles, domains and technologies you genuinely want to work on."></textarea>
+      </label>
+      <label class="wide">Resume text used by AI
+        <textarea id="resume_text" rows="9" placeholder="Import your PDF resume below or paste verified resume text here."></textarea>
       </label>
     </section>
 
     <section class="panel">
       <h2>Reusable answers</h2>
-      <p>For recurring questions not covered above, save equivalent question wordings once. Format each line as <strong>wording 1 / wording 2 = answer</strong>. FiFo will reuse it only when the match is strong. Sensitive declarations still require review.</p>
+      <p>For recurring factual questions not covered above, save equivalent wordings once. Format each line as <strong>wording 1 / wording 2 = answer</strong>. Sensitive declarations still require review.</p>
       <label class="wide">Answer bank
         <textarea id="answer_bank" rows="8" placeholder="University roll number / enrollment number = YOUR_VALUE&#10;Preferred shift / shift preference = Day shift&#10;How did you hear about us / source = University placement cell"></textarea>
       </label>
@@ -110,9 +127,9 @@
 
     <section class="panel">
       <h2>Resume import</h2>
-      <p>PDF import currently extracts conservative contact suggestions. It never overwrites your saved profile automatically.</p>
+      <p>Importing a PDF extracts contact suggestions and local resume text for grounded AI answers. Nothing from this profile is committed to GitHub.</p>
       <input id="resume" type="file" accept="application/pdf" />
-      <button id="importResume" class="secondary">Inspect resume</button>
+      <button id="importResume" class="secondary">Inspect & Load Resume</button>
       <pre id="resumeResult" class="result hidden"></pre>
     </section>
 
