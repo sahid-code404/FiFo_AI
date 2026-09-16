@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FiFo AI",
   "description": "AI-assisted job and application form autofill with grounded Gemini drafts and review-first safety.",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "permissions": ["storage", "activeTab", "tabs", "webNavigation"],
   "host_permissions": [
     "http://localhost:8000/*"
