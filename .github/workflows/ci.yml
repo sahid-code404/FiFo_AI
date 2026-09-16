@@ -39,7 +39,14 @@ jobs:
           root = Path('apps/extension')
           manifest = json.loads((root / 'manifest.json').read_text())
           assert manifest['manifest_version'] == 3
+          assert any(pattern in manifest['content_scripts'][0]['matches'] for pattern in ['http://*/*', 'https://*/*'])
           for name in ['background.js', 'content.js', 'popup.html', 'popup.js', 'options.html', 'options.js']:
               assert (root / name).exists(), name
           print('Extension structure is valid')
           PY
+      - name: Check extension JavaScript syntax
+        run: |
+          node --check apps/extension/background.js
+          node --check apps/extension/content.js
+          node --check apps/extension/popup.js
+          node --check apps/extension/options.js
