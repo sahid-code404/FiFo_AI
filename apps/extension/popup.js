@@ -10,8 +10,22 @@ function apiRequest(path, method = "GET", body) {
 
 async function checkApi() {
   const response = await apiRequest("/health");
-  apiStatus.textContent = response?.ok ? "Connected" : "Offline";
-  apiStatus.className = `pill ${response?.ok ? "ok" : "bad"}`;
+  if (!response?.ok) {
+    apiStatus.textContent = "Offline";
+    apiStatus.className = "pill bad";
+    return;
+  }
+
+  const provider = response.data?.ai_provider;
+  const model = response.data?.ai_model;
+  if (provider === "gemini") {
+    apiStatus.textContent = `Connected · Gemini${model ? ` (${model})` : ""}`;
+  } else if (provider === "openai_compatible") {
+    apiStatus.textContent = `Connected · AI${model ? ` (${model})` : ""}`;
+  } else {
+    apiStatus.textContent = "Connected · AI off";
+  }
+  apiStatus.className = "pill ok";
 }
 
 profileButton.addEventListener("click", () => chrome.runtime.openOptionsPage());
@@ -52,13 +66,12 @@ async function analyzeTabFrames(tabId) {
         continue;
       }
 
+      const withFrame = { ...result, _frameId: frame.frameId };
       if (!best || (result.summary?.total || 0) > (best.summary?.total || 0)) {
-        best = result;
+        best = withFrame;
       }
 
-      // Once a frame actually filled known fields, it is almost certainly the
-      // application frame. Stop so unrelated embedded widgets are not touched.
-      if ((result.summary?.filled || 0) > 0) return result;
+      if ((result.summary?.filled || 0) > 0) return withFrame;
     } catch (error) {
       lastError = error;
     }
@@ -68,9 +81,22 @@ async function analyzeTabFrames(tabId) {
   throw lastError || new Error("No supported form frame was found on this page.");
 }
 
+async function generateAiDrafts(tabId, frameId) {
+  try {
+    const result = await chrome.tabs.sendMessage(
+      tabId,
+      { type: "FIFO_GENERATE_AI_DRAFTS" },
+      { frameId: frameId ?? 0 }
+    );
+    return result?.ok ? result : { ok: false, error: result?.error || "AI drafting failed." };
+  } catch (error) {
+    return { ok: false, error: error?.message || String(error) };
+  }
+}
+
 analyzeButton.addEventListener("click", async () => {
   analyzeButton.disabled = true;
-  analyzeButton.textContent = "Analyzing…";
+  analyzeButton.textContent = "Analyzing & drafting…";
   message.textContent = "";
 
   try {
@@ -82,20 +108,36 @@ analyzeButton.addEventListener("click", async () => {
     const result = await analyzeTabFrames(tab.id);
     if (!result?.ok) throw new Error(result?.error || "Could not analyze the form.");
 
+    const aiDrafts = await generateAiDrafts(tab.id, result._frameId);
     const summary = result.summary;
     document.getElementById("filledCount").textContent = summary.filled;
+    document.getElementById("aiDraftCount").textContent = aiDrafts?.drafted || 0;
     document.getElementById("reviewCount").textContent = summary.review;
     document.getElementById("missingCount").textContent = summary.missing;
     document.getElementById("unknownCount").textContent = summary.unknown;
     resultCard.classList.remove("hidden");
 
     const detected = result.source || "web form";
-    const aiSuffix = result.semantic_ai?.used ? " AI semantic matching was used for unfamiliar wording." : "";
-    if (summary.review || summary.missing || summary.unknown) {
-      message.textContent = `${summary.filled} field(s) filled on this ${detected}. Review the remaining questions before submitting.${aiSuffix}`;
-    } else {
-      message.textContent = `All detected supported fields were filled on this ${detected}. Review the form before submitting.${aiSuffix}`;
+    const parts = [`${summary.filled} verified fact field(s) filled on this ${detected}.`];
+
+    if (aiDrafts?.drafted) {
+      parts.push(`${aiDrafts.drafted} narrative answer(s) were drafted by AI and inserted for review.`);
+    } else if (aiDrafts?.not_configured) {
+      parts.push("AI drafting is off. Add GEMINI_API_KEY to apps/api/.env and restart the API.");
+    } else if (aiDrafts && !aiDrafts.ok) {
+      parts.push(`AI drafting could not run: ${aiDrafts.error}`);
     }
+
+    if (aiDrafts?.needs_input) {
+      parts.push(`${aiDrafts.needs_input} question(s) need your own input because FiFo could not support an answer from your saved facts.`);
+    }
+    if (summary.review || summary.missing || summary.unknown) {
+      parts.push("Review every remaining or AI-written answer before submitting.");
+    } else {
+      parts.push("Review the completed form before submitting.");
+    }
+
+    message.textContent = parts.join(" ");
   } catch (error) {
     resultCard.classList.remove("hidden");
     const text = error?.message || String(error);
@@ -106,7 +148,7 @@ analyzeButton.addEventListener("click", async () => {
     }
   } finally {
     analyzeButton.disabled = false;
-    analyzeButton.textContent = "Analyze & Fill This Form";
+    analyzeButton.textContent = "Analyze, Fill & Draft Answers";
   }
 });
 
