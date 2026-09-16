@@ -13,20 +13,21 @@ ALIASES: dict[str, list[str]] = {
         "student name", "legal name", "name as per records", "name as per government id",
     ],
     "first_name": ["first name", "given name", "forename"],
-    "middle_name": ["middle name"],
+    "middle_name": ["middle name", "additional name"],
     "last_name": ["last name", "surname", "family name"],
     "email": [
         "email", "email address", "email id", "mail id", "personal email",
-        "personal email address", "candidate email", "registered email",
+        "personal email address", "candidate email", "registered email", "primary email",
     ],
     "phone": [
         "phone", "phone number", "mobile", "mobile number", "contact number", "contact no",
         "contact number of candidate", "whatsapp number", "primary phone", "primary mobile",
+        "telephone", "telephone number",
     ],
     "date_of_birth": ["date of birth", "dob", "birth date", "birthday"],
     "gender": ["gender", "sex"],
     "nationality": ["nationality", "citizenship", "country of citizenship"],
-    "address": ["address", "current address", "present address", "residential address", "mailing address"],
+    "address": ["address", "current address", "present address", "residential address", "mailing address", "street address"],
     "city": ["city", "current city", "city of residence", "residence city", "home city"],
     "state": ["state", "state of residence", "current state", "province", "region"],
     "country": ["country", "country of residence", "current country"],
@@ -34,7 +35,7 @@ ALIASES: dict[str, list[str]] = {
     "college": [
         "college", "college name", "university", "university name", "institute", "institute name",
         "institution", "institution name", "college university", "college or university",
-        "current college", "current university", "educational institution",
+        "current college", "current university", "educational institution", "school university",
     ],
     "degree": [
         "degree", "course", "programme", "program", "qualification", "current degree",
@@ -42,48 +43,75 @@ ALIASES: dict[str, list[str]] = {
     ],
     "stream": [
         "stream", "branch", "department", "specialization", "specialisation", "major",
-        "major subject", "discipline", "field of study", "course specialization",
+        "major subject", "discipline", "field of study", "course specialization", "area of study",
     ],
     "passing_year": [
         "passing year", "year of passing", "graduation year", "year of graduation",
         "expected graduation year", "expected year of graduation", "graduating year",
-        "batch", "batch year", "graduation batch", "degree completion year",
+        "batch", "batch year", "graduation batch", "degree completion year", "completion year",
     ],
-    "semester": ["semester", "current semester", "sem"],
+    "semester": ["semester", "current semester", "sem", "present semester"],
     "cgpa": [
         "cgpa", "graduation cgpa", "cgpa graduation", "current cgpa", "overall cgpa",
         "cumulative cgpa", "gpa", "current gpa", "cumulative gpa", "overall gpa",
+        "aggregate cgpa", "college cgpa",
     ],
     "class_x_percentage": [
         "class x percentage", "percentage class x", "10th percentage", "class 10 percentage",
         "class 10 marks", "10th marks", "secondary percentage", "ssc percentage",
-        "matric percentage", "matriculation percentage",
+        "matric percentage", "matriculation percentage", "10th score", "class x marks percentage",
     ],
     "class_x_board": ["class x board", "10th board", "class 10 board", "secondary board", "ssc board"],
-    "class_x_year": ["class x passing year", "10th passing year", "class 10 passing year", "ssc passing year"],
+    "class_x_year": ["class x passing year", "10th passing year", "class 10 passing year", "ssc passing year", "10th year of passing"],
     "class_xii_percentage": [
         "class xii percentage", "percentage class xii", "12th percentage", "class 12 percentage",
         "class 12 marks", "12th marks", "higher secondary percentage", "hsc percentage",
-        "senior secondary percentage",
+        "senior secondary percentage", "12th score", "class xii marks percentage",
     ],
     "class_xii_board": ["class xii board", "12th board", "class 12 board", "higher secondary board", "hsc board"],
-    "class_xii_year": ["class xii passing year", "12th passing year", "class 12 passing year", "hsc passing year"],
+    "class_xii_year": ["class xii passing year", "12th passing year", "class 12 passing year", "hsc passing year", "12th year of passing"],
     "current_location": [
         "current location", "present location", "current place", "current city location",
-        "where are you currently located", "current residence location",
+        "where are you currently located", "current residence location", "present city location",
     ],
     "preferred_city": [
         "preferred city", "preferred location", "preferred city market of work", "preferred work location",
         "preferred job location", "job location preference", "location preference", "preferred posting location",
+        "preferred base location",
     ],
     "joining_date": [
         "joining date", "earliest joining date", "earliest available joining date", "availability date",
-        "available from", "date available", "earliest start date", "when can you join",
+        "available from", "date available", "earliest start date", "when can you join", "available start date",
     ],
-    "notice_period": ["notice period", "notice period days", "current notice period"],
+    "notice_period": ["notice period", "notice period days", "current notice period", "days notice", "availability notice period"],
+    "current_employer": ["current employer", "current company", "present employer", "present company", "employer name"],
+    "current_job_title": ["current job title", "current designation", "present designation", "job title", "current role", "designation"],
+    "years_experience": [
+        "years of experience", "total years of experience", "total experience", "overall experience",
+        "work experience years", "professional experience", "experience in years",
+    ],
+    "work_mode": ["preferred work mode", "work mode", "work arrangement", "preferred work arrangement", "remote hybrid onsite preference"],
     "github": ["github", "github profile", "github url", "github link", "github profile url"],
     "linkedin": ["linkedin", "linkedin profile", "linkedin url", "linkedin link", "linkedin profile url"],
-    "portfolio": ["portfolio", "portfolio url", "portfolio link", "website", "personal website"],
+    "portfolio": ["portfolio", "portfolio url", "portfolio link", "website", "personal website", "personal site", "website url"],
+}
+
+AUTOCOMPLETE_MAP: dict[str, str] = {
+    "name": "name",
+    "given-name": "first_name",
+    "additional-name": "middle_name",
+    "family-name": "last_name",
+    "email": "email",
+    "tel": "phone",
+    "tel-national": "phone",
+    "bday": "date_of_birth",
+    "street-address": "address",
+    "address-line1": "address",
+    "address-level2": "city",
+    "address-level1": "state",
+    "country-name": "country",
+    "postal-code": "postal_code",
+    "url": "portfolio",
 }
 
 # Terms that indicate the form is asking for a different entity/context than the
@@ -99,6 +127,8 @@ NEGATIVE_TERMS: dict[str, set[str]] = {
     "current_location": {"preferred", "job", "office", "posting"},
     "preferred_city": {"current", "present", "residence", "home"},
     "cgpa": {"10th", "12th", "class x", "class xii", "ssc", "hsc"},
+    "current_employer": {"desired", "preferred", "target"},
+    "current_job_title": {"desired", "preferred", "target"},
 }
 
 # These categories must always be reviewed even if the profile later contains a
@@ -110,6 +140,7 @@ REVIEW_TERMS = {
     "visa sponsorship", "work authorization", "notice buyout", "why should", "why do you",
     "tell us", "describe", "short note", "essay", "cover letter", "motivation",
     "strength", "weakness", "comfortable with", "willing to", "conflict of interest",
+    "veteran", "race", "ethnicity", "sexual orientation", "pronoun", "demographic",
 }
 
 
@@ -121,20 +152,49 @@ def normalize(value: str) -> str:
 
 
 def tokens(value: str) -> set[str]:
-    stop = {"the", "a", "an", "of", "your", "candidate", "applicant", "please", "enter", "provide", "select"}
+    stop = {"the", "a", "an", "of", "your", "candidate", "applicant", "please", "enter", "provide", "select", "choose"}
     return {part for part in normalize(value).split() if part not in stop and len(part) > 1}
 
 
-def get_value(profile: dict[str, Any], key: str) -> Any:
+def canonical_fields() -> list[str]:
+    return sorted(ALIASES)
+
+
+def is_review_question(label: str) -> bool:
+    normalized = normalize(label)
+    return any(term in normalized for term in REVIEW_TERMS)
+
+
+def _raw_value(profile: dict[str, Any], key: str) -> Any:
     if key in profile:
-        value = profile[key]
-    else:
-        value = None
-        for section_name in ("facts", "preferences", "links"):
-            section = profile.get(section_name) or {}
-            if key in section:
-                value = section[key]
-                break
+        return profile[key]
+    for section_name in ("facts", "preferences", "links"):
+        section = profile.get(section_name) or {}
+        if key in section:
+            return section[key]
+    return None
+
+
+def get_value(profile: dict[str, Any], key: str) -> Any:
+    value = _raw_value(profile, key)
+
+    # Safe deterministic derivations: they transform an already verified fact;
+    # they do not introduce new claims.
+    if value in (None, "") and key in {"first_name", "middle_name", "last_name"}:
+        full_name = str(_raw_value(profile, "name") or "").strip()
+        parts = [part for part in full_name.split() if part]
+        if parts:
+            if key == "first_name":
+                value = parts[0]
+            elif key == "last_name" and len(parts) > 1:
+                value = parts[-1]
+            elif key == "middle_name" and len(parts) > 2:
+                value = " ".join(parts[1:-1])
+
+    if value in (None, "") and key == "city":
+        value = _raw_value(profile, "current_location")
+    if value in (None, "") and key == "current_location":
+        value = _raw_value(profile, "city")
 
     if isinstance(value, list):
         return ", ".join(str(item) for item in value if str(item).strip())
@@ -153,8 +213,6 @@ def alias_score(label: str, alias: str) -> float:
     if label_norm == alias_norm:
         return 1.0
 
-    # Labels collected from browser forms may combine several hints with pipes;
-    # containment is a strong signal when the alias is at least two characters.
     if alias_norm in label_norm:
         return 0.96 if len(alias_norm.split()) >= 2 else 0.91
     if label_norm in alias_norm and len(label_norm.split()) >= 2:
@@ -174,8 +232,6 @@ def alias_score(label: str, alias: str) -> float:
 
 
 def custom_answer_match(label: str, profile: dict[str, Any]) -> dict[str, Any] | None:
-    # Optional extensibility for fields a user sees repeatedly. Structure:
-    # answer_bank: [{"aliases": ["..."], "value": "...", "auto_fill": true}]
     bank = profile.get("answer_bank") or []
     best: tuple[float, dict[str, Any]] | None = None
     for item in bank:
@@ -197,17 +253,52 @@ def custom_answer_match(label: str, profile: dict[str, Any]) -> dict[str, Any] |
     }
 
 
-def best_match(label: str, profile: dict[str, Any]) -> dict[str, Any]:
+def result_for_key(
+    key: str,
+    profile: dict[str, Any],
+    confidence: float,
+    *,
+    reason: str | None = None,
+    allow_autofill: bool = True,
+) -> dict[str, Any]:
+    if key not in ALIASES:
+        return {"status": "unknown", "confidence": round(confidence, 3)}
+
+    value = get_value(profile, key)
+    if value in (None, "", []):
+        return {
+            "status": "missing",
+            "field": key,
+            "confidence": round(confidence, 3),
+            "reason": "profile_value_missing",
+        }
+
+    result: dict[str, Any] = {
+        "status": "autofill" if allow_autofill and confidence >= 0.90 else "review",
+        "field": key,
+        "value": value,
+        "confidence": round(confidence, 3),
+    }
+    if reason:
+        result["reason"] = reason
+    return result
+
+
+def best_match(label: str, profile: dict[str, Any], autocomplete: str = "") -> dict[str, Any]:
     normalized = normalize(label)
-    if not normalized:
+    if not normalized and not autocomplete:
         return {"status": "unknown", "confidence": 0.0}
 
-    if any(term in normalized for term in REVIEW_TERMS):
+    if is_review_question(label):
         return {"status": "review", "confidence": 0.0, "reason": "question_requires_explicit_review"}
 
     custom = custom_answer_match(label, profile)
     if custom:
         return custom
+
+    auto_key = AUTOCOMPLETE_MAP.get((autocomplete or "").strip().lower())
+    if auto_key and not has_negative_context(auto_key, normalized):
+        return result_for_key(auto_key, profile, 0.99, reason="html_autocomplete_semantics")
 
     best_key = None
     best_score = 0.0
@@ -223,18 +314,4 @@ def best_match(label: str, profile: dict[str, Any]) -> dict[str, Any]:
     if best_key is None or best_score < 0.82:
         return {"status": "unknown", "confidence": round(best_score, 3)}
 
-    value = get_value(profile, best_key)
-    if value in (None, "", []):
-        return {
-            "status": "missing",
-            "field": best_key,
-            "confidence": round(best_score, 3),
-            "reason": "profile_value_missing",
-        }
-
-    return {
-        "status": "autofill" if best_score >= 0.90 else "review",
-        "field": best_key,
-        "value": value,
-        "confidence": round(best_score, 3),
-    }
+    return result_for_key(best_key, profile, best_score)
