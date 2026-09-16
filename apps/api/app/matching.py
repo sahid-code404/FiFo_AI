@@ -13,7 +13,7 @@ ALIASES: dict[str, list[str]] = {
     "degree": ["degree", "course", "programme", "program"],
     "stream": ["stream", "branch", "department", "specialization", "specialisation"],
     "passing_year": ["passing year", "year of passing", "graduation year", "batch"],
-    "cgpa": ["cgpa", "graduation cgpa", "current cgpa"],
+    "cgpa": ["cgpa", "graduation cgpa", "cgpa graduation", "current cgpa"],
     "class_x_percentage": ["class x percentage", "percentage class x", "10th percentage", "class 10 percentage", "secondary percentage"],
     "class_xii_percentage": ["class xii percentage", "percentage class xii", "12th percentage", "class 12 percentage", "higher secondary percentage"],
     "current_location": ["current location", "location", "current city", "city of residence"],
