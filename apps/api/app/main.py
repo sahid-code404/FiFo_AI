@@ -11,8 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from pypdf import PdfReader
 
-from .llm import generate_answer
-from .matching import best_match
+from .llm import classify_fields, configured as llm_configured, generate_answer
+from .matching import best_match, canonical_fields, result_for_key
 from .storage import create_application, get_profile, init_db, list_applications, save_profile
 
 
@@ -21,6 +21,8 @@ class FieldInfo(BaseModel):
     label: str
     type: str = "text"
     options: list[str] = Field(default_factory=list)
+    autocomplete: str = ""
+    source: str = ""
 
 
 class MatchRequest(BaseModel):
@@ -48,7 +50,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="FiFo AI API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="FiFo AI API", version="0.2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -59,8 +61,8 @@ app.add_middleware(
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, Any]:
+    return {"status": "ok", "version": "0.2.0", "semantic_ai": llm_configured()}
 
 
 @app.get("/profile")
@@ -102,18 +104,56 @@ async def import_resume(file: UploadFile = File(...)) -> dict[str, Any]:
         "filename": file.filename,
         "characters": len(text),
         "suggestions": suggestions,
-        "note": "The MVP extracts contact fields conservatively. Review suggestions before saving.",
+        "note": "Contact facts are extracted conservatively. Review suggestions before saving.",
     }
 
 
 @app.post("/match-fields")
-def match_fields(request: MatchRequest) -> dict[str, Any]:
+async def match_fields(request: MatchRequest) -> dict[str, Any]:
     profile = get_profile()
-    results = []
+    indexed: dict[str, dict[str, Any]] = {}
+    unknown_for_ai: list[dict[str, Any]] = []
+
     for field in request.fields:
-        result = best_match(field.label, profile)
-        results.append({"id": field.id, "label": field.label, **result})
-    return {"results": results}
+        result = best_match(field.label, profile, field.autocomplete)
+        indexed[field.id] = {"id": field.id, "label": field.label, **result}
+        if result.get("status") == "unknown":
+            unknown_for_ai.append(field.model_dump())
+
+    ai_used = False
+    if unknown_for_ai and llm_configured():
+        try:
+            semantic = await classify_fields(unknown_for_ai, canonical_fields())
+            ai_used = True
+        except (RuntimeError, httpx.HTTPError, KeyError, ValueError):
+            semantic = {}
+
+        for field in unknown_for_ai:
+            match = semantic.get(field["id"])
+            if not match:
+                continue
+            confidence = float(match.get("confidence", 0.0))
+            if confidence < 0.85:
+                continue
+            key = str(match.get("key") or "")
+            semantic_result = result_for_key(
+                key,
+                profile,
+                confidence,
+                reason="ai_semantic_field_match",
+                allow_autofill=confidence >= 0.94,
+            )
+            indexed[field["id"]] = {
+                "id": field["id"],
+                "label": field["label"],
+                **semantic_result,
+            }
+
+    results = [indexed[field.id] for field in request.fields]
+    return {
+        "results": results,
+        "semantic_ai": {"configured": llm_configured(), "used": ai_used},
+    }
 
 
 @app.post("/generate-answer")
