@@ -12,23 +12,24 @@
       <div class="logo">F</div>
       <div>
         <h1>FiFo AI</h1>
-        <p>Application autofill assistant</p>
+        <p>Universal application autofill + AI drafts</p>
       </div>
     </div>
 
     <section class="card">
       <div class="status-row">
-        <span>API</span>
+        <span>API / AI</span>
         <span id="apiStatus" class="pill muted">Checking…</span>
       </div>
-      <button id="analyzeButton" class="primary">Analyze & Fill This Form</button>
+      <button id="analyzeButton" class="primary">Analyze, Fill & Draft Answers</button>
       <button id="profileButton" class="secondary">Edit My Profile</button>
     </section>
 
     <section id="resultCard" class="card hidden">
       <h2>Form summary</h2>
       <div class="grid">
-        <div><strong id="filledCount">0</strong><span>Filled</span></div>
+        <div><strong id="filledCount">0</strong><span>Facts</span></div>
+        <div><strong id="aiDraftCount">0</strong><span>AI Drafts</span></div>
         <div><strong id="reviewCount">0</strong><span>Review</span></div>
         <div><strong id="missingCount">0</strong><span>Missing</span></div>
         <div><strong id="unknownCount">0</strong><span>Unknown</span></div>
@@ -36,7 +37,7 @@
       <p id="message" class="message"></p>
     </section>
 
-    <p class="fineprint">FiFo AI never submits a form automatically. Review all answers before submitting.</p>
+    <p class="fineprint">AI-written answers are drafts only. FiFo never auto-submits forms and never invents missing personal facts.</p>
   </main>
   <script src="popup.js"></script>
 </body>
