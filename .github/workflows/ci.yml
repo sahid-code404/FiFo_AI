@@ -8,6 +8,8 @@ on:
 jobs:
   api-tests:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}/apps/api
     defaults:
       run:
         working-directory: apps/api
