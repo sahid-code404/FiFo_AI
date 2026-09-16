@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "FiFo AI",
+  "description": "AI-assisted student application form autofill with review-first safety.",
+  "version": "0.1.0",
+  "permissions": ["storage", "activeTab", "tabs"],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "https://docs.google.com/forms/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "FiFo AI"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/forms/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
