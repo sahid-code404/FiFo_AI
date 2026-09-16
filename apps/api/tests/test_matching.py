@@ -47,6 +47,32 @@ def test_graduation_year_variants_map_to_passing_year():
         assert result["field"] == "passing_year"
 
 
+def test_academic_year_variants_map_to_saved_year_level():
+    profile = {"facts": {"academic_year": "Final Year / Senior"}}
+    for label in ["What is your current academic year?", "Current year of study", "Year level"]:
+        result = best_match(label, profile)
+        assert result["status"] == "autofill", label
+        assert result["field"] == "academic_year"
+        assert result["value"] == "Final Year / Senior"
+
+
+def test_internship_track_variants_map_to_preference():
+    profile = {"preferences": {"preferred_track": "Software Engineering"}}
+    for label in ["Which internship track are you applying for?", "Preferred internship role", "Role applying for"]:
+        result = best_match(label, profile)
+        assert result["status"] == "autofill", label
+        assert result["field"] == "preferred_track"
+        assert result["value"] == "Software Engineering"
+
+
+def test_proficiency_question_maps_to_saved_level():
+    profile = {"facts": {"proficiency_level": "4"}}
+    result = best_match("Rate your proficiency in the primary tools or programming languages required for your chosen track.", profile)
+    assert result["status"] == "autofill"
+    assert result["field"] == "proficiency_level"
+    assert result["value"] == "4"
+
+
 def test_school_marks_variants_are_distinct():
     profile = {"facts": {"class_x_percentage": "75", "class_xii_percentage": "92"}}
     ten = best_match("SSC Percentage", profile)
@@ -85,6 +111,14 @@ def test_employment_wording_maps_to_employment_fact():
     assert result["status"] == "autofill"
     assert result["field"] == "current_job_title"
     assert result["value"] == "QA Engineer"
+
+
+def test_portfolio_question_can_fallback_to_github():
+    profile = {"links": {"portfolio": "", "github": "https://github.com/example"}}
+    result = best_match("Portfolio URL", profile)
+    assert result["status"] == "autofill"
+    assert result["field"] == "portfolio"
+    assert result["value"] == "https://github.com/example"
 
 
 def test_missing_value_is_not_invented():
