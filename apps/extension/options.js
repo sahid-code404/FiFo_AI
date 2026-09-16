@@ -4,12 +4,12 @@ const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 const factFields = [
   "name", "first_name", "middle_name", "last_name", "email", "phone", "date_of_birth", "gender",
   "nationality", "address", "city", "state", "country", "postal_code", "current_location",
-  "college", "degree", "stream", "passing_year", "semester", "cgpa",
+  "college", "degree", "stream", "passing_year", "semester", "academic_year", "cgpa", "proficiency_level",
   "class_x_percentage", "class_x_board", "class_x_year",
   "class_xii_percentage", "class_xii_board", "class_xii_year",
   "current_employer", "current_job_title", "years_experience", "joining_date", "notice_period"
 ];
-const preferenceFields = ["preferred_city", "work_mode"];
+const preferenceFields = ["preferred_city", "work_mode", "preferred_track"];
 const linkFields = ["github", "linkedin", "portfolio"];
 const aiKnowledgeFields = ["projects", "experience", "achievements", "career_goals", "resume_text"];
 
@@ -123,8 +123,8 @@ async function refreshConnectionStatus() {
       byId("connectionStatus").textContent = `Connected · AI ${health.ai_model || ""}`.trim();
       byId("aiStatus").textContent = `AI configured (${health.ai_model || "custom model"})`;
     } else {
-      byId("connectionStatus").textContent = "Connected · AI not configured";
-      byId("aiStatus").textContent = "Gemini key not configured";
+      byId("connectionStatus").textContent = "Connected · Gemini key needed";
+      byId("aiStatus").textContent = "Paste a Gemini API key above, save it, then run Test Gemini.";
     }
   } catch (error) {
     byId("connectionStatus").textContent = `Offline: ${error.message}`;
