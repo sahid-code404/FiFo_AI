@@ -6,98 +6,260 @@ function normalize(value) {
     .replace(/\s+/g, " ");
 }
 
-function questionBlocks() {
-  const googleBlocks = [...document.querySelectorAll(".Qr7Oae")];
-  if (googleBlocks.length) return googleBlocks;
-  return [...document.querySelectorAll("[data-params]")];
+function humanize(value) {
+  return String(value || "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_\-.]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function findLabel(block) {
+function isUsableControl(element) {
+  if (!(element instanceof HTMLElement)) return false;
+  if (element.matches("input[type='password'], input[type='hidden'], input[type='submit'], input[type='button'], input[type='reset']")) return false;
+  if (element.hasAttribute("disabled") || element.getAttribute("aria-disabled") === "true") return false;
+  return element.matches("input, textarea, select, [role='textbox'], [role='combobox'], [role='radiogroup']");
+}
+
+function textFromAriaLabelledBy(element) {
+  const ids = (element.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean);
+  return ids.map((id) => document.getElementById(id)?.textContent?.trim()).filter(Boolean).join(" ");
+}
+
+function labelForControl(element) {
+  const parts = [];
+
+  if (element.id) {
+    try {
+      const explicit = document.querySelector(`label[for='${CSS.escape(element.id)}']`);
+      if (explicit?.textContent?.trim()) parts.push(explicit.textContent.trim());
+    } catch (_) {}
+  }
+
+  const wrappingLabel = element.closest("label");
+  if (wrappingLabel?.textContent?.trim()) parts.push(wrappingLabel.textContent.trim());
+
+  const ariaLabelledBy = textFromAriaLabelledBy(element);
+  if (ariaLabelledBy) parts.push(ariaLabelledBy);
+
+  const ariaLabel = element.getAttribute("aria-label");
+  if (ariaLabel) parts.push(ariaLabel);
+
+  const placeholder = element.getAttribute("placeholder");
+  if (placeholder) parts.push(placeholder);
+
+  const name = humanize(element.getAttribute("name"));
+  if (name) parts.push(name);
+
+  const id = humanize(element.id);
+  if (id) parts.push(id);
+
+  const fieldset = element.closest("fieldset");
+  const legend = fieldset?.querySelector("legend")?.textContent?.trim();
+  if (legend) parts.push(legend);
+
+  const unique = [];
+  const seen = new Set();
+  for (const part of parts) {
+    const cleaned = String(part).replace(/\s*\*\s*$/, "").trim();
+    const key = normalize(cleaned);
+    if (cleaned && key && !seen.has(key)) {
+      seen.add(key);
+      unique.push(cleaned);
+    }
+  }
+
+  return unique.slice(0, 4).join(" | ");
+}
+
+function googleQuestionBlocks() {
+  const blocks = [...document.querySelectorAll(".Qr7Oae")];
+  if (blocks.length) return blocks;
+  return [...document.querySelectorAll("[data-params]")].filter((node) => node.querySelector("input, textarea, [role='radiogroup'], [role='listbox']"));
+}
+
+function findGoogleLabel(block) {
   const preferred = [
     ".M7eMe",
     "[role='heading']",
     "label",
     ".freebirdFormviewerComponentsQuestionBaseTitle"
   ];
-
   for (const selector of preferred) {
     const element = block.querySelector(selector);
     const text = element?.textContent?.trim();
     if (text) return text.replace(/\s*\*\s*$/, "").trim();
   }
-
   return "";
 }
 
-function getFieldType(block) {
-  if (block.querySelector("input[type='file']")) return "file";
-  if (block.querySelector("textarea")) return "textarea";
-  if (block.querySelector("[role='radiogroup']")) return "radio";
-  if (block.querySelector("[role='checkbox']")) return "checkbox";
-  if (block.querySelector("select")) return "select";
-  if (block.querySelector("[role='listbox']")) return "select";
-  const input = block.querySelector("input");
+function getFieldType(target) {
+  const scope = target instanceof HTMLElement ? target : document;
+  if (scope.matches?.("input[type='file']") || scope.querySelector?.("input[type='file']")) return "file";
+  if (scope.matches?.("textarea") || scope.querySelector?.("textarea")) return "textarea";
+  if (scope.matches?.("select") || scope.querySelector?.("select")) return "select";
+  if (scope.matches?.("[role='radiogroup']") || scope.querySelector?.("[role='radiogroup']")) return "radio";
+  if (scope.matches?.("[role='combobox']") || scope.querySelector?.("[role='combobox'], [role='listbox']")) return "select";
+  const input = scope.matches?.("input") ? scope : scope.querySelector?.("input");
   return input?.type || "text";
 }
 
-function getOptions(block) {
-  return [...block.querySelectorAll("[role='radio'], [role='checkbox'], option")]
-    .map((node) => node.textContent?.trim() || node.getAttribute("data-value") || node.value || "")
-    .filter(Boolean);
-}
-
-function extractFields() {
-  return questionBlocks()
-    .map((block, index) => {
-      const label = findLabel(block);
-      if (!label) return null;
-      const id = `fifo-${index}`;
-      block.dataset.fifoId = id;
-      return {
-        id,
-        label,
-        type: getFieldType(block),
-        options: getOptions(block)
-      };
+function getOptions(target) {
+  const scope = target instanceof HTMLElement ? target : document;
+  if (scope.matches?.("select")) {
+    return [...scope.options].map((option) => option.textContent?.trim() || option.value || "").filter(Boolean);
+  }
+  return [...scope.querySelectorAll?.("[role='radio'], [role='checkbox'], option, input[type='radio'], input[type='checkbox']") || []]
+    .map((node) => {
+      if (node instanceof HTMLInputElement) {
+        const label = node.id ? document.querySelector(`label[for='${CSS.escape(node.id)}']`) : null;
+        return label?.textContent?.trim() || node.value || "";
+      }
+      return node.textContent?.trim() || node.getAttribute("data-value") || node.value || "";
     })
     .filter(Boolean);
 }
 
+function extractGoogleFields() {
+  return googleQuestionBlocks()
+    .map((block, index) => {
+      const label = findGoogleLabel(block);
+      if (!label) return null;
+      const id = `fifo-google-${index}`;
+      block.dataset.fifoId = id;
+      return { id, label, type: getFieldType(block), options: getOptions(block), source: "google_forms" };
+    })
+    .filter(Boolean);
+}
+
+function groupKeyForControl(control, index) {
+  if (control instanceof HTMLInputElement && ["radio", "checkbox"].includes(control.type) && control.name) {
+    return `${control.type}:${control.name}`;
+  }
+  return `single:${index}`;
+}
+
+function extractGenericFields() {
+  const controls = [...document.querySelectorAll("input, textarea, select, [role='textbox'], [role='combobox'], [role='radiogroup']")]
+    .filter(isUsableControl);
+
+  const groups = new Map();
+  controls.forEach((control, index) => {
+    const key = groupKeyForControl(control, index);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(control);
+  });
+
+  const results = [];
+  let seq = 0;
+  for (const group of groups.values()) {
+    const first = group[0];
+    let target = first;
+    if (group.length > 1) {
+      target = first.closest("fieldset, [role='radiogroup'], .form-group, .field, .question") || first.parentElement || first;
+    }
+
+    let label = labelForControl(first);
+    if (!label && target !== first) {
+      const legend = target.querySelector?.("legend, label, [role='heading']")?.textContent?.trim();
+      if (legend) label = legend;
+    }
+    if (!label) continue;
+
+    const id = `fifo-generic-${seq++}`;
+    target.dataset.fifoId = id;
+
+    const options = group.length > 1
+      ? group.map((node) => {
+          if (node instanceof HTMLInputElement) {
+            const explicit = node.id ? document.querySelector(`label[for='${CSS.escape(node.id)}']`) : null;
+            return explicit?.textContent?.trim() || node.value || "";
+          }
+          return node.textContent?.trim() || "";
+        }).filter(Boolean)
+      : getOptions(target);
+
+    results.push({
+      id,
+      label,
+      type: getFieldType(first),
+      options,
+      source: "generic_web",
+      autocomplete: first.getAttribute("autocomplete") || ""
+    });
+  }
+  return results;
+}
+
+function extractFields() {
+  const google = extractGoogleFields();
+  if (google.length) return google;
+  return extractGenericFields();
+}
+
 function setNativeValue(element, value) {
   const stringValue = String(value ?? "");
-  const prototype = element instanceof HTMLTextAreaElement
-    ? HTMLTextAreaElement.prototype
-    : HTMLInputElement.prototype;
-  const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
-
-  if (descriptor?.set) descriptor.set.call(element, stringValue);
-  else element.value = stringValue;
-
+  if (element instanceof HTMLSelectElement) {
+    element.value = stringValue;
+  } else {
+    const prototype = element instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+    if (descriptor?.set) descriptor.set.call(element, stringValue);
+    else element.value = stringValue;
+  }
   element.dispatchEvent(new Event("input", { bubbles: true }));
   element.dispatchEvent(new Event("change", { bubbles: true }));
+  element.dispatchEvent(new Event("blur", { bubbles: true }));
 }
 
 function fillText(block, value) {
-  const element = block.querySelector("textarea, input:not([type='file']):not([type='radio']):not([type='checkbox'])");
+  const element = block.matches?.("textarea, input:not([type='file']):not([type='radio']):not([type='checkbox']), [role='textbox']")
+    ? block
+    : block.querySelector("textarea, input:not([type='file']):not([type='radio']):not([type='checkbox']), [role='textbox']");
   if (!element) return false;
+  if (element.getAttribute("type") === "password") return false;
   setNativeValue(element, value);
   return true;
 }
 
-function fillRadio(block, value) {
+function optionTextForInput(input) {
+  if (!(input instanceof HTMLInputElement)) return "";
+  if (input.id) {
+    const label = document.querySelector(`label[for='${CSS.escape(input.id)}']`);
+    if (label?.textContent?.trim()) return label.textContent.trim();
+  }
+  return input.value || input.closest("label")?.textContent?.trim() || "";
+}
+
+function fillChoice(block, value) {
   const target = normalize(value);
-  const radios = [...block.querySelectorAll("[role='radio']")];
-  const match = radios.find((radio) => {
-    const text = normalize(radio.textContent || radio.getAttribute("data-value") || "");
+  const ariaChoices = [...block.querySelectorAll?.("[role='radio'], [role='checkbox']") || []];
+  const nativeChoices = [...block.querySelectorAll?.("input[type='radio'], input[type='checkbox']") || []];
+
+  const ariaMatch = ariaChoices.find((choice) => {
+    const text = normalize(choice.textContent || choice.getAttribute("data-value") || choice.getAttribute("aria-label") || "");
     return text === target || text.includes(target) || target.includes(text);
   });
-  if (!match) return false;
-  match.click();
-  return true;
+  if (ariaMatch) {
+    ariaMatch.click();
+    return true;
+  }
+
+  const nativeMatch = nativeChoices.find((choice) => {
+    const text = normalize(optionTextForInput(choice));
+    return text === target || text.includes(target) || target.includes(text);
+  });
+  if (nativeMatch) {
+    nativeMatch.click();
+    return true;
+  }
+  return false;
 }
 
 function fillNativeSelect(block, value) {
-  const select = block.querySelector("select");
+  const select = block.matches?.("select") ? block : block.querySelector?.("select");
   if (!select) return false;
   const target = normalize(value);
   const option = [...select.options].find((candidate) => {
@@ -106,25 +268,43 @@ function fillNativeSelect(block, value) {
   });
   if (!option) return false;
   select.value = option.value;
+  select.dispatchEvent(new Event("input", { bubbles: true }));
   select.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
+function fillAriaSelect(block, value) {
+  const trigger = block.matches?.("[role='combobox'], [role='listbox']")
+    ? block
+    : block.querySelector?.("[role='combobox'], [role='listbox']");
+  if (!trigger) return false;
+
+  trigger.click();
+  const target = normalize(value);
+  const options = [...document.querySelectorAll("[role='option']")];
+  const match = options.find((option) => {
+    const text = normalize(option.textContent || option.getAttribute("data-value") || option.getAttribute("aria-label") || "");
+    return text === target || text.includes(target) || target.includes(text);
+  });
+  if (!match) return false;
+  match.click();
   return true;
 }
 
 function fillField(result) {
   const block = document.querySelector(`[data-fifo-id='${CSS.escape(result.id)}']`);
   if (!block || result.value === undefined || result.value === null) return false;
-
   const type = getFieldType(block);
-  if (type === "file") return false;
-  if (type === "radio" || type === "checkbox") return fillRadio(block, result.value);
-  if (type === "select") return fillNativeSelect(block, result.value) || fillText(block, result.value);
+  if (type === "file" || type === "password") return false;
+  if (type === "radio" || type === "checkbox") return fillChoice(block, result.value);
+  if (type === "select") return fillNativeSelect(block, result.value) || fillAriaSelect(block, result.value) || fillText(block, result.value);
   return fillText(block, result.value);
 }
 
 async function analyzeAndFill() {
   const fields = extractFields();
   if (!fields.length) {
-    return { ok: false, error: "No supported form fields were detected on this page." };
+    return { ok: false, error: "No supported application fields were detected on this page." };
   }
 
   const response = await chrome.runtime.sendMessage({
