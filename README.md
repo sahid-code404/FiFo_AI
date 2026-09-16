@@ -1,6 +1,6 @@
 # FiFo AI
 
-FiFo AI is an AI-assisted job/application-form companion. It stores an editable personal profile once, recognizes differently worded questions across company forms, fills high-confidence verified facts, flags unknown or sensitive questions for review, and can optionally use an LLM to understand unfamiliar field wording without allowing the model to invent factual answers.
+FiFo AI is an AI-assisted job/application-form companion. It stores an editable personal profile once, recognizes differently worded questions across company forms, fills high-confidence verified facts, flags unknown or sensitive questions for review, and can use Gemini to draft grounded narrative answers such as 200-word short notes, project descriptions, motivation answers and other general-purpose application responses.
 
 ## Current capabilities
 
@@ -11,11 +11,14 @@ FiFo AI is an AI-assisted job/application-form companion. It stores an editable 
 - Editable reusable profile for identity, contact, education, employment, availability, location and links
 - Semantic alias matching: e.g. `Contact No.`, `Primary mobile`, `Telephone number` -> the same saved phone value
 - HTML `autocomplete` semantics when forms provide them
-- Optional AI semantic classifier for unfamiliar company wording
+- Optional Gemini semantic classifier for unfamiliar company wording
+- Gemini-powered narrative drafting for short notes, project/experience questions, motivation, self-introductions and other open-ended application questions
+- Detects common word-limit wording such as `maximum 200 words`, `up to 150 words`, etc.
+- Batch AI drafting to reduce latency/API calls when a form has several narrative questions
+- PDF resume import and local resume text grounding for AI answers
 - Reusable custom answer bank for recurring company-specific fields
 - Confidence-based autofill; factual values always come from saved verified profile data
-- Sensitive, subjective, consent, declaration, salary, legal/eligibility and demographic questions remain review-only
-- PDF resume inspection with conservative contact extraction
+- Sensitive, consent, declaration, salary, legal/eligibility and demographic questions remain review-only
 - FastAPI + SQLite local backend
 - CI tests for backend matching and extension JavaScript/manifest validation
 
@@ -23,7 +26,9 @@ FiFo AI is an AI-assisted job/application-form companion. It stores an editable 
 
 FiFo AI separates **understanding the question** from **answering the question**.
 
-For normal factual fields, the system may use aliases, HTML metadata or an optional LLM to identify what a field means. The value itself is still taken only from the user's saved profile. If that value is missing, FiFo reports it as missing instead of generating one.
+For normal factual fields, aliases, HTML metadata or Gemini may identify what a field means. The actual value still comes only from the user's saved profile. If a required personal fact is missing, FiFo reports that it needs user input instead of inventing one.
+
+For narrative questions, Gemini may write a draft using only the saved profile, imported resume text, skills, projects, experience, achievements, career goals and reusable answers. General non-personal questions may be answered normally. Every AI-written answer remains a draft that the user must review.
 
 ## Repository layout
 
@@ -76,9 +81,29 @@ After pulling an update that changes the manifest or content script, press **Rel
 
 The extension expects the local API at `http://localhost:8000` by default.
 
-## Optional AI semantic matching
+## Gemini setup
 
-Deterministic aliases work without any AI key. To enable semantic interpretation of unfamiliar field wording, configure any OpenAI-compatible chat-completions provider in `apps/api/.env`:
+The easiest setup does not require editing `.env`.
+
+1. Create a Gemini API key in Google AI Studio.
+2. Open **FiFo AI -> Edit My Profile**.
+3. In **Gemini AI**, paste the key.
+4. Leave the model as `gemini-3.8-flash` unless you intentionally want another supported Gemini model.
+5. Click **Save AI settings**.
+6. Click **Test Gemini**.
+
+The extension stores the key with `chrome.storage.local`, not `chrome.storage.sync`. The key is not included in the profile database or Git repository. It is attached by the extension background process only when talking to the configured FiFo API.
+
+You can alternatively configure Gemini server-side in `apps/api/.env`:
+
+```env
+GEMINI_API_KEY=your-local-secret
+GEMINI_MODEL=gemini-3.8-flash
+```
+
+Never commit a real API key.
+
+The optional OpenAI-compatible fallback remains available:
 
 ```env
 LLM_BASE_URL=https://your-provider.example/v1
@@ -86,9 +111,29 @@ LLM_API_KEY=your-local-secret
 LLM_MODEL=your-model-name
 ```
 
-Restart the API after changing `.env`. The `/health` endpoint reports whether semantic AI is configured.
+Restart the API after changing `.env`. The `/health` endpoint reports the active AI provider/model, and `/ai/test` verifies that the configured provider can actually generate a response.
 
-The classifier receives field labels/options and the list of allowed profile keys, but not the user's actual profile values. Its output is treated as a field classification only. High confidence is required before autofill; medium-confidence matches remain review-only.
+## AI answer flow
+
+When **Analyze, Fill & Draft Answers** is pressed:
+
+1. FiFo detects the application fields.
+2. Deterministic matching fills verified factual fields.
+3. Gemini can classify unfamiliar wording when deterministic matching is insufficient.
+4. Empty narrative fields are detected.
+5. The form's requested word limit is extracted when possible; otherwise FiFo defaults to 200 words.
+6. Gemini drafts answers from the saved profile and resume context.
+7. Drafts are inserted into the form for review, never automatically submitted.
+
+Examples include:
+
+- `Short note of maximum 200 words: something you built and what you learned`
+- `Tell us about yourself`
+- `Describe a project relevant to this role`
+- `Why are you interested in this internship?`
+- `What did you learn from your team experience?`
+- `Summarize your technical skills`
+- general non-personal questions that do not require inventing applicant facts
 
 ## Form coverage
 
