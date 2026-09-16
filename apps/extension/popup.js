@@ -26,6 +26,48 @@ function isSupportedWebPage(url) {
   }
 }
 
+async function analyzeTabFrames(tabId) {
+  let frames = [];
+  try {
+    frames = await chrome.webNavigation.getAllFrames({ tabId });
+  } catch (_) {
+    frames = [];
+  }
+
+  if (!frames?.length) frames = [{ frameId: 0 }];
+  frames.sort((a, b) => (a.frameId === 0 ? -1 : b.frameId === 0 ? 1 : a.frameId - b.frameId));
+
+  let best = null;
+  let lastError = null;
+
+  for (const frame of frames) {
+    try {
+      const result = await chrome.tabs.sendMessage(
+        tabId,
+        { type: "FIFO_ANALYZE_AND_FILL" },
+        { frameId: frame.frameId }
+      );
+      if (!result?.ok) {
+        lastError = new Error(result?.error || "Could not analyze this frame.");
+        continue;
+      }
+
+      if (!best || (result.summary?.total || 0) > (best.summary?.total || 0)) {
+        best = result;
+      }
+
+      // Once a frame actually filled known fields, it is almost certainly the
+      // application frame. Stop so unrelated embedded widgets are not touched.
+      if ((result.summary?.filled || 0) > 0) return result;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (best) return best;
+  throw lastError || new Error("No supported form frame was found on this page.");
+}
+
 analyzeButton.addEventListener("click", async () => {
   analyzeButton.disabled = true;
   analyzeButton.textContent = "Analyzing…";
@@ -37,7 +79,7 @@ analyzeButton.addEventListener("click", async () => {
       throw new Error("Open a normal web-based job/application form first, then run FiFo AI.");
     }
 
-    const result = await chrome.tabs.sendMessage(tab.id, { type: "FIFO_ANALYZE_AND_FILL" });
+    const result = await analyzeTabFrames(tab.id);
     if (!result?.ok) throw new Error(result?.error || "Could not analyze the form.");
 
     const summary = result.summary;
@@ -48,10 +90,11 @@ analyzeButton.addEventListener("click", async () => {
     resultCard.classList.remove("hidden");
 
     const detected = result.source || "web form";
+    const aiSuffix = result.semantic_ai?.used ? " AI semantic matching was used for unfamiliar wording." : "";
     if (summary.review || summary.missing || summary.unknown) {
-      message.textContent = `${summary.filled} field(s) filled on this ${detected}. Review the remaining questions before submitting.`;
+      message.textContent = `${summary.filled} field(s) filled on this ${detected}. Review the remaining questions before submitting.${aiSuffix}`;
     } else {
-      message.textContent = `All detected supported fields were filled on this ${detected}. Review the form before submitting.`;
+      message.textContent = `All detected supported fields were filled on this ${detected}. Review the form before submitting.${aiSuffix}`;
     }
   } catch (error) {
     resultCard.classList.remove("hidden");
