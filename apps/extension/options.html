@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FiFo AI Profile</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="logo">F</div>
+      <div>
+        <h1>FiFo AI Profile</h1>
+        <p>Store facts once. FiFo AI uses only saved information for factual autofill.</p>
+      </div>
+    </header>
+
+    <section class="panel">
+      <h2>Connection</h2>
+      <label>API URL
+        <input id="apiUrl" type="url" value="http://localhost:8000" />
+      </label>
+      <div class="row-actions">
+        <button id="saveConnection" class="secondary">Save connection</button>
+        <span id="connectionStatus" class="status"></span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-title">
+        <div>
+          <h2>Verified facts</h2>
+          <p>Marks, identity and education fields should always be checked before saving.</p>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <label>Full name<input id="name" autocomplete="name" /></label>
+        <label>Email<input id="email" type="email" autocomplete="email" /></label>
+        <label>Phone<input id="phone" autocomplete="tel" /></label>
+        <label>College / University<input id="college" /></label>
+        <label>Degree<input id="degree" placeholder="B.Tech" /></label>
+        <label>Stream / Branch<input id="stream" placeholder="CSE (AI & ML)" /></label>
+        <label>Passing year<input id="passing_year" inputmode="numeric" /></label>
+        <label>CGPA<input id="cgpa" inputmode="decimal" /></label>
+        <label>Class X percentage<input id="class_x_percentage" inputmode="decimal" /></label>
+        <label>Class XII percentage<input id="class_xii_percentage" inputmode="decimal" /></label>
+        <label>Current location<input id="current_location" /></label>
+        <label>Earliest joining date<input id="joining_date" type="date" /></label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Preferences & links</h2>
+      <div class="form-grid">
+        <label>Preferred city / work location<input id="preferred_city" /></label>
+        <label>GitHub<input id="github" placeholder="https://github.com/..." /></label>
+        <label>LinkedIn<input id="linkedin" placeholder="https://www.linkedin.com/in/..." /></label>
+      </div>
+      <label class="wide">Skills (comma separated)
+        <textarea id="skills" rows="3" placeholder="Python, FastAPI, React, robotics..."></textarea>
+      </label>
+      <label class="wide">Projects / experience notes
+        <textarea id="projects" rows="7" placeholder="Add concise facts the AI may use for application answers. Do not add anything you cannot verify."></textarea>
+      </label>
+    </section>
+
+    <section class="panel">
+      <h2>Resume import</h2>
+      <p>PDF import currently extracts only conservative contact suggestions. It never overwrites your saved profile automatically.</p>
+      <input id="resume" type="file" accept="application/pdf" />
+      <button id="importResume" class="secondary">Inspect resume</button>
+      <pre id="resumeResult" class="result hidden"></pre>
+    </section>
+
+    <section class="sticky-actions">
+      <span id="saveStatus"></span>
+      <button id="saveProfile" class="primary">Save profile</button>
+    </section>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>
