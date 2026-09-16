@@ -16,6 +16,16 @@ async function checkApi() {
 
 profileButton.addEventListener("click", () => chrome.runtime.openOptionsPage());
 
+function isSupportedWebPage(url) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch (_) {
+    return false;
+  }
+}
+
 analyzeButton.addEventListener("click", async () => {
   analyzeButton.disabled = true;
   analyzeButton.textContent = "Analyzing…";
@@ -23,8 +33,8 @@ analyzeButton.addEventListener("click", async () => {
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id || !tab.url?.startsWith("https://docs.google.com/forms/")) {
-      throw new Error("Open a Google Form first, then run FiFo AI.");
+    if (!tab?.id || !isSupportedWebPage(tab.url)) {
+      throw new Error("Open a normal web-based job/application form first, then run FiFo AI.");
     }
 
     const result = await chrome.tabs.sendMessage(tab.id, { type: "FIFO_ANALYZE_AND_FILL" });
@@ -37,14 +47,20 @@ analyzeButton.addEventListener("click", async () => {
     document.getElementById("unknownCount").textContent = summary.unknown;
     resultCard.classList.remove("hidden");
 
+    const detected = result.source || "web form";
     if (summary.review || summary.missing || summary.unknown) {
-      message.textContent = "Known facts were filled. Check the remaining questions manually before submitting.";
+      message.textContent = `${summary.filled} field(s) filled on this ${detected}. Review the remaining questions before submitting.`;
     } else {
-      message.textContent = "All detected supported fields were filled. Review the form before submitting.";
+      message.textContent = `All detected supported fields were filled on this ${detected}. Review the form before submitting.`;
     }
   } catch (error) {
     resultCard.classList.remove("hidden");
-    message.textContent = error.message || String(error);
+    const text = error?.message || String(error);
+    if (text.includes("Receiving end does not exist") || text.includes("Could not establish connection")) {
+      message.textContent = "FiFo AI is not loaded on this tab yet. Reload the page once after updating/reloading the extension, then try again.";
+    } else {
+      message.textContent = text;
+    }
   } finally {
     analyzeButton.disabled = false;
     analyzeButton.textContent = "Analyze & Fill This Form";
