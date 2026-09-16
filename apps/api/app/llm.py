@@ -10,37 +10,42 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
 
-def provider_name() -> str:
-    if os.getenv("GEMINI_API_KEY"):
+def provider_name(gemini_api_key: str | None = None) -> str:
+    if (gemini_api_key or os.getenv("GEMINI_API_KEY")):
         return "gemini"
     if os.getenv("LLM_BASE_URL") and os.getenv("LLM_API_KEY") and os.getenv("LLM_MODEL"):
         return "openai_compatible"
     return "none"
 
 
-def configured() -> bool:
-    return provider_name() != "none"
+def configured(gemini_api_key: str | None = None) -> bool:
+    return provider_name(gemini_api_key) != "none"
 
 
-def provider_status() -> dict[str, Any]:
-    provider = provider_name()
+def provider_status(
+    gemini_api_key: str | None = None,
+    gemini_model: str | None = None,
+) -> dict[str, Any]:
+    provider = provider_name(gemini_api_key)
     if provider == "gemini":
         return {
             "configured": True,
             "provider": "gemini",
-            "model": os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
+            "model": (gemini_model or os.getenv("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL).strip(),
+            "key_source": "extension_local" if gemini_api_key else "environment",
         }
     if provider == "openai_compatible":
         return {
             "configured": True,
             "provider": "openai_compatible",
             "model": os.getenv("LLM_MODEL", ""),
+            "key_source": "environment",
         }
-    return {"configured": False, "provider": "none", "model": None}
+    return {"configured": False, "provider": "none", "model": None, "key_source": None}
 
 
 def _openai_client_config() -> tuple[str, str, str]:
@@ -89,18 +94,20 @@ def _gemini_messages(messages: list[dict[str, str]]) -> tuple[str, list[dict[str
     return "\n\n".join(system_parts), contents
 
 
-async def _gemini_chat(messages: list[dict[str, str]], *, temperature: float = 0.0) -> str:
-    api_key = os.getenv("GEMINI_API_KEY")
+async def _gemini_chat(
+    messages: list[dict[str, str]],
+    *,
+    gemini_api_key: str | None = None,
+    gemini_model: str | None = None,
+) -> str:
+    api_key = (gemini_api_key or os.getenv("GEMINI_API_KEY") or "").strip()
     if not api_key:
         raise RuntimeError("Gemini is not configured")
 
-    model = os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL).strip() or DEFAULT_GEMINI_MODEL
+    model = (gemini_model or os.getenv("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL).strip()
     base_url = os.getenv("GEMINI_BASE_URL", DEFAULT_GEMINI_BASE_URL).rstrip("/")
     system_text, contents = _gemini_messages(messages)
-    payload: dict[str, Any] = {
-        "contents": contents,
-        "generationConfig": {"temperature": temperature},
-    }
+    payload: dict[str, Any] = {"contents": contents}
     if system_text:
         payload["system_instruction"] = {"parts": [{"text": system_text}]}
 
@@ -123,13 +130,41 @@ async def _gemini_chat(messages: list[dict[str, str]], *, temperature: float = 0
     return text
 
 
-async def _chat(messages: list[dict[str, str]], *, temperature: float = 0.0) -> str:
-    provider = provider_name()
+async def _chat(
+    messages: list[dict[str, str]],
+    *,
+    temperature: float = 0.0,
+    gemini_api_key: str | None = None,
+    gemini_model: str | None = None,
+) -> str:
+    provider = provider_name(gemini_api_key)
     if provider == "gemini":
-        return await _gemini_chat(messages, temperature=temperature)
+        return await _gemini_chat(
+            messages,
+            gemini_api_key=gemini_api_key,
+            gemini_model=gemini_model,
+        )
     if provider == "openai_compatible":
         return await _openai_chat(messages, temperature=temperature)
     raise RuntimeError("No AI provider is configured")
+
+
+async def test_provider(
+    gemini_api_key: str | None = None,
+    gemini_model: str | None = None,
+) -> dict[str, Any]:
+    status = provider_status(gemini_api_key, gemini_model)
+    if not status["configured"]:
+        return {**status, "ok": False, "error": "No AI provider configured"}
+    text = await _chat(
+        [
+            {"role": "system", "content": "Return exactly the word OK and nothing else."},
+            {"role": "user", "content": "Connection test"},
+        ],
+        gemini_api_key=gemini_api_key,
+        gemini_model=gemini_model,
+    )
+    return {**status, "ok": text.strip().upper().startswith("OK")}
 
 
 def _extract_json_object(text: str) -> dict[str, Any]:
@@ -154,7 +189,6 @@ def _extract_json_object(text: str) -> dict[str, Any]:
 
 
 def _safe_profile_for_ai(profile: dict[str, Any]) -> dict[str, Any]:
-    """Keep only profile knowledge intentionally used for application drafting."""
     allowed = {
         "facts",
         "preferences",
@@ -162,6 +196,8 @@ def _safe_profile_for_ai(profile: dict[str, Any]) -> dict[str, Any]:
         "skills",
         "projects",
         "experience",
+        "achievements",
+        "career_goals",
         "answer_bank",
         "resume_text",
     }
@@ -175,8 +211,13 @@ def _word_limited(text: str, max_words: int) -> str:
     return " ".join(words[:max_words]).rstrip(" ,;:-") + "."
 
 
-async def classify_fields(fields: list[dict[str, Any]], allowed_keys: list[str]) -> dict[str, dict[str, Any]]:
-    """Classify unfamiliar field wording to canonical profile keys without seeing values."""
+async def classify_fields(
+    fields: list[dict[str, Any]],
+    allowed_keys: list[str],
+    *,
+    gemini_api_key: str | None = None,
+    gemini_model: str | None = None,
+) -> dict[str, dict[str, Any]]:
     if not fields:
         return {}
 
@@ -209,6 +250,8 @@ async def classify_fields(fields: list[dict[str, Any]], allowed_keys: list[str])
             {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
         ],
         temperature=0.0,
+        gemini_api_key=gemini_api_key,
+        gemini_model=gemini_model,
     )
     parsed = _extract_json_object(text)
     allowed = set(allowed_keys)
@@ -233,24 +276,29 @@ async def generate_answer(
     profile: dict[str, Any],
     max_words: int = 200,
     context: str = "",
+    *,
+    gemini_api_key: str | None = None,
+    gemini_model: str | None = None,
 ) -> str:
     max_words = max(20, min(int(max_words), 500))
     safe_profile = _safe_profile_for_ai(profile)
     system = (
-        "You draft concise job/internship/application form answers. "
+        "You draft concise job, internship, scholarship, education, hackathon, and application-form answers. "
         "For any statement about the applicant, use only facts contained in the supplied verified profile, "
-        "resume text, saved projects, skills, experience, preferences, or reusable answers. "
+        "resume text, saved projects, skills, experience, achievements, career goals, preferences, or reusable answers. "
         "Never invent achievements, marks, dates, employers, responsibilities, skills, projects, preferences, "
         "personal circumstances, or eligibility facts. If a personal answer needs information that is missing, "
         "output exactly NEEDS_USER_INPUT. For non-personal/general-knowledge questions, you may answer normally. "
         "Do not answer legal declarations, consent, salary expectations, demographic/sensitive questions, "
         "criminal-history questions, disability/category questions, visa/work-authorization questions, or binding commitments; "
         "for those output exactly NEEDS_USER_INPUT. "
+        "Write naturally in first person when the question is about the applicant. Avoid fake enthusiasm, buzzword stuffing, "
+        "and unsupported claims. "
         f"Respect the requested limit and keep the answer at or below {max_words} words. Return plain text only, no markdown."
     )
     payload = {
         "question": question,
-        "page_context": context[:1500],
+        "page_context": context[:2000],
         "verified_profile": safe_profile,
         "max_words": max_words,
     }
@@ -260,6 +308,8 @@ async def generate_answer(
             {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
         ],
         temperature=0.25,
+        gemini_api_key=gemini_api_key,
+        gemini_model=gemini_model,
     )
     answer = answer.strip()
     if answer == "NEEDS_USER_INPUT":
@@ -271,8 +321,10 @@ async def generate_answers(
     fields: list[dict[str, Any]],
     profile: dict[str, Any],
     context: str = "",
+    *,
+    gemini_api_key: str | None = None,
+    gemini_model: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Generate several narrative drafts in one model call to reduce latency/quota use."""
     if not fields:
         return []
 
@@ -288,17 +340,18 @@ async def generate_answers(
         )
 
     system = (
-        "Draft answers for job/internship/application form narrative questions. "
+        "Draft answers for job, internship, scholarship, education, hackathon, and application-form narrative questions. "
         "Applicant-specific claims must come only from the verified profile/resume supplied. Never fabricate. "
         "If a personal answer cannot be supported, or the question asks for legal consent/declaration, salary/CTC, "
         "demographic/sensitive data, criminal history, disability/category, visa/work authorization, or a binding commitment, "
         "set status to needs_user_input and answer to null. General-knowledge questions may be answered normally. "
-        "Obey each max_words limit. Return JSON only: "
+        "Use first person for applicant-specific responses, keep the tone professional and natural, and obey each max_words limit. "
+        "Return JSON only: "
         '{"answers":[{"id":"...","status":"draft|needs_user_input","answer":"text or null"}]}. '
         "Do not add markdown or commentary."
     )
     user_payload = {
-        "page_context": context[:1500],
+        "page_context": context[:2000],
         "verified_profile": safe_profile,
         "questions": normalized_fields,
     }
@@ -308,6 +361,8 @@ async def generate_answers(
             {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
         ],
         temperature=0.25,
+        gemini_api_key=gemini_api_key,
+        gemini_model=gemini_model,
     )
     parsed = _extract_json_object(raw)
     limits = {item["id"]: item["max_words"] for item in normalized_fields}
