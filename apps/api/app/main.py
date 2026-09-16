@@ -11,7 +11,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from pypdf import PdfReader
 
-from .llm import classify_fields, configured as llm_configured, generate_answer
+from .llm import (
+    classify_fields,
+    configured as llm_configured,
+    generate_answer,
+    generate_answers,
+    provider_status,
+)
 from .matching import best_match, canonical_fields, result_for_key
 from .storage import create_application, get_profile, init_db, list_applications, save_profile
 
@@ -32,6 +38,18 @@ class MatchRequest(BaseModel):
 class GenerateRequest(BaseModel):
     question: str
     max_words: int = Field(default=200, ge=20, le=500)
+    context: str = Field(default="", max_length=3000)
+
+
+class DraftField(BaseModel):
+    id: str
+    question: str
+    max_words: int = Field(default=200, ge=20, le=500)
+
+
+class GenerateBatchRequest(BaseModel):
+    fields: list[DraftField] = Field(default_factory=list, max_length=12)
+    context: str = Field(default="", max_length=3000)
 
 
 class ApplicationCreate(BaseModel):
@@ -50,7 +68,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="FiFo AI API", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="FiFo AI API", version="0.4.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -62,7 +80,19 @@ app.add_middleware(
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "version": "0.2.0", "semantic_ai": llm_configured()}
+    ai = provider_status()
+    return {
+        "status": "ok",
+        "version": "0.4.0",
+        "semantic_ai": ai["configured"],
+        "ai_provider": ai["provider"],
+        "ai_model": ai["model"],
+    }
+
+
+@app.get("/ai/status")
+def ai_status() -> dict[str, Any]:
+    return provider_status()
 
 
 @app.get("/profile")
@@ -78,7 +108,7 @@ def profile_put(payload: dict[str, Any]) -> dict[str, Any]:
 @app.post("/profile/import-resume")
 async def import_resume(file: UploadFile = File(...)) -> dict[str, Any]:
     if not (file.filename or "").lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="MVP currently accepts PDF resumes only")
+        raise HTTPException(status_code=400, detail="PDF resumes are currently supported")
 
     raw = await file.read()
     if len(raw) > 10 * 1024 * 1024:
@@ -89,6 +119,11 @@ async def import_resume(file: UploadFile = File(...)) -> dict[str, Any]:
         text = "\n".join(page.extract_text() or "" for page in reader.pages)
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Could not parse PDF") from exc
+
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    # Keep enough local resume context for grounded application answers while
+    # preventing accidental huge prompts from malformed PDFs.
+    resume_text = text[:30000]
 
     email_match = re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", text, re.I)
     compact = re.sub(r"[()]+", "", text)
@@ -104,7 +139,8 @@ async def import_resume(file: UploadFile = File(...)) -> dict[str, Any]:
         "filename": file.filename,
         "characters": len(text),
         "suggestions": suggestions,
-        "note": "Contact facts are extracted conservatively. Review suggestions before saving.",
+        "resume_text": resume_text,
+        "note": "Resume text is returned for local profile storage so AI drafts can stay grounded in your CV. Review before saving.",
     }
 
 
@@ -159,15 +195,35 @@ async def match_fields(request: MatchRequest) -> dict[str, Any]:
 @app.post("/generate-answer")
 async def answer_generate(request: GenerateRequest) -> dict[str, Any]:
     try:
-        answer = await generate_answer(request.question, get_profile(), request.max_words)
+        answer = await generate_answer(
+            request.question,
+            get_profile(),
+            request.max_words,
+            context=request.context,
+        )
     except RuntimeError:
         return {"status": "not_configured", "answer": None}
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail="LLM provider request failed") from exc
+    except (httpx.HTTPError, KeyError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="AI provider request failed") from exc
 
     if answer == "NEEDS_USER_INPUT":
         return {"status": "needs_user_input", "answer": None}
-    return {"status": "review", "answer": answer}
+    return {"status": "draft", "answer": answer}
+
+
+@app.post("/generate-answers")
+async def answers_generate(request: GenerateBatchRequest) -> dict[str, Any]:
+    if not llm_configured():
+        return {"status": "not_configured", "answers": []}
+    try:
+        answers = await generate_answers(
+            [item.model_dump() for item in request.fields],
+            get_profile(),
+            context=request.context,
+        )
+    except (RuntimeError, httpx.HTTPError, KeyError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="AI provider request failed") from exc
+    return {"status": "ok", "answers": answers, "provider": provider_status()}
 
 
 @app.get("/applications")
