@@ -1,4 +1,5 @@
 const DEFAULT_API_URL = "http://localhost:8000";
+const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 
 const factFields = [
   "name", "first_name", "middle_name", "last_name", "email", "phone", "date_of_birth", "gender",
@@ -21,9 +22,27 @@ async function getApiUrl() {
   return (stored.apiUrl || DEFAULT_API_URL).replace(/\/$/, "");
 }
 
+async function getAiSettings() {
+  const stored = await chrome.storage.local.get(["geminiApiKey", "geminiModel"]);
+  return {
+    geminiApiKey: String(stored.geminiApiKey || "").trim(),
+    geminiModel: String(stored.geminiModel || DEFAULT_GEMINI_MODEL).trim() || DEFAULT_GEMINI_MODEL
+  };
+}
+
 async function api(path, options = {}) {
   const apiUrl = await getApiUrl();
-  const response = await fetch(`${apiUrl}${path}`, options);
+  const ai = await getAiSettings();
+  const body = options.body;
+  const headers = new Headers(options.headers || {});
+
+  if (!(body instanceof FormData) && body !== undefined && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (ai.geminiApiKey) headers.set("X-FiFo-Gemini-Key", ai.geminiApiKey);
+  if (ai.geminiModel) headers.set("X-FiFo-Gemini-Model", ai.geminiModel);
+
+  const response = await fetch(`${apiUrl}${path}`, { ...options, headers });
   const data = await response.json().catch(() => null);
   if (!response.ok) throw new Error(data?.detail || `HTTP ${response.status}`);
   return data;
@@ -94,23 +113,38 @@ function collectProfile(existing = {}) {
   };
 }
 
+async function refreshConnectionStatus() {
+  try {
+    const health = await api("/health");
+    if (health?.ai_provider === "gemini") {
+      byId("connectionStatus").textContent = `Connected · Gemini ${health.ai_model || ""}`.trim();
+      byId("aiStatus").textContent = `Gemini configured (${health.ai_model || DEFAULT_GEMINI_MODEL})`;
+    } else if (health?.ai_provider === "openai_compatible") {
+      byId("connectionStatus").textContent = `Connected · AI ${health.ai_model || ""}`.trim();
+      byId("aiStatus").textContent = `AI configured (${health.ai_model || "custom model"})`;
+    } else {
+      byId("connectionStatus").textContent = "Connected · AI not configured";
+      byId("aiStatus").textContent = "Gemini key not configured";
+    }
+  } catch (error) {
+    byId("connectionStatus").textContent = `Offline: ${error.message}`;
+  }
+}
+
 let loadedProfile = {};
 
 async function load() {
   const stored = await chrome.storage.sync.get(["apiUrl"]);
   byId("apiUrl").value = stored.apiUrl || DEFAULT_API_URL;
 
+  const ai = await getAiSettings();
+  byId("geminiApiKey").value = ai.geminiApiKey;
+  byId("geminiModel").value = ai.geminiModel;
+
   try {
     loadedProfile = await api("/profile") || {};
     fillProfile(loadedProfile);
-    const health = await api("/health").catch(() => null);
-    if (health?.ai_provider === "gemini") {
-      byId("connectionStatus").textContent = `Connected · Gemini ${health.ai_model || ""}`.trim();
-    } else if (health?.ai_provider === "openai_compatible") {
-      byId("connectionStatus").textContent = `Connected · AI ${health.ai_model || ""}`.trim();
-    } else {
-      byId("connectionStatus").textContent = "Connected · AI not configured";
-    }
+    await refreshConnectionStatus();
   } catch (error) {
     byId("connectionStatus").textContent = `Offline: ${error.message}`;
   }
@@ -120,12 +154,37 @@ byId("saveConnection").addEventListener("click", async () => {
   const apiUrl = byId("apiUrl").value.trim().replace(/\/$/, "") || DEFAULT_API_URL;
   await chrome.storage.sync.set({ apiUrl });
   byId("connectionStatus").textContent = "Connection saved";
+  await refreshConnectionStatus();
+});
+
+byId("saveAiSettings").addEventListener("click", async () => {
+  const geminiApiKey = byId("geminiApiKey").value.trim();
+  const geminiModel = byId("geminiModel").value.trim() || DEFAULT_GEMINI_MODEL;
+  await chrome.storage.local.set({ geminiApiKey, geminiModel });
+  byId("aiStatus").textContent = geminiApiKey
+    ? `Saved locally · ${geminiModel}`
+    : "Gemini key cleared";
+  await refreshConnectionStatus();
+});
+
+byId("testAi").addEventListener("click", async () => {
+  const geminiApiKey = byId("geminiApiKey").value.trim();
+  const geminiModel = byId("geminiModel").value.trim() || DEFAULT_GEMINI_MODEL;
+  await chrome.storage.local.set({ geminiApiKey, geminiModel });
+
+  if (!geminiApiKey) {
+    byId("aiStatus").textContent = "Paste a Gemini API key first.";
+    return;
+  }
+
+  byId("aiStatus").textContent = "Testing Gemini…";
   try {
-    const health = await api("/health");
-    const ai = health?.ai_provider === "gemini" ? ` · Gemini ${health.ai_model || ""}` : "";
-    byId("connectionStatus").textContent = `Connected${ai}`.trim();
+    const result = await api("/ai/test", { method: "POST" });
+    byId("aiStatus").textContent = result?.ok
+      ? `Gemini ready · ${result.model || geminiModel}`
+      : `Gemini test failed${result?.error ? `: ${result.error}` : ""}`;
   } catch (error) {
-    byId("connectionStatus").textContent = `Saved, but API is offline: ${error.message}`;
+    byId("aiStatus").textContent = `Gemini test failed: ${error.message}`;
   }
 });
 
