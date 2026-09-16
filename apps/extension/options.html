@@ -28,6 +28,30 @@
     </section>
 
     <section class="panel">
+      <h2>Gemini AI</h2>
+      <p>Optional. Add your own Gemini API key to generate grounded short notes, project answers, motivation answers, general-purpose responses and unfamiliar-field semantic matching. The key is stored only in this browser's local extension storage; it is not saved in your profile, synced with Chrome, or committed to GitHub.</p>
+      <div class="form-grid">
+        <label>Gemini API key
+          <input id="geminiApiKey" type="password" autocomplete="off" placeholder="Paste your Gemini API key" />
+        </label>
+        <label>Gemini model
+          <input id="geminiModel" list="geminiModels" placeholder="gemini-3.8-flash" />
+          <datalist id="geminiModels">
+            <option value="gemini-3.8-flash"></option>
+            <option value="gemini-3.6-flash"></option>
+            <option value="gemini-3.5-flash-lite"></option>
+          </datalist>
+        </label>
+      </div>
+      <div class="row-actions">
+        <button id="saveAiSettings" class="secondary">Save AI settings</button>
+        <button id="testAi" class="secondary">Test Gemini</button>
+        <span id="aiStatus" class="status"></span>
+      </div>
+      <p class="status">FiFo sends this key only from the extension to your configured FiFo API when an AI request is needed. Never put the real key in the public repository.</p>
+    </section>
+
+    <section class="panel">
       <div class="section-title">
         <div>
           <h2>Identity & contact</h2>
