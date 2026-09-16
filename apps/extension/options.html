@@ -12,7 +12,7 @@
       <div class="logo">F</div>
       <div>
         <h1>FiFo AI Profile</h1>
-        <p>Store facts once. FiFo AI uses only saved information for factual autofill.</p>
+        <p>Store facts once. FiFo AI maps different company wording back to the same saved answers.</p>
       </div>
     </header>
 
@@ -30,45 +30,76 @@
     <section class="panel">
       <div class="section-title">
         <div>
-          <h2>Verified facts</h2>
-          <p>Marks, identity and education fields should always be checked before saving.</p>
+          <h2>Identity & contact</h2>
+          <p>Only save facts you have verified. Empty fields are never guessed.</p>
         </div>
       </div>
-
       <div class="form-grid">
         <label>Full name<input id="name" autocomplete="name" /></label>
+        <label>First name<input id="first_name" autocomplete="given-name" /></label>
+        <label>Middle name<input id="middle_name" autocomplete="additional-name" /></label>
+        <label>Last name / surname<input id="last_name" autocomplete="family-name" /></label>
         <label>Email<input id="email" type="email" autocomplete="email" /></label>
         <label>Phone<input id="phone" autocomplete="tel" /></label>
-        <label>College / University<input id="college" /></label>
-        <label>Degree<input id="degree" placeholder="B.Tech" /></label>
-        <label>Stream / Branch<input id="stream" placeholder="CSE (AI & ML)" /></label>
-        <label>Passing year<input id="passing_year" inputmode="numeric" /></label>
-        <label>CGPA<input id="cgpa" inputmode="decimal" /></label>
-        <label>Class X percentage<input id="class_x_percentage" inputmode="decimal" /></label>
-        <label>Class XII percentage<input id="class_xii_percentage" inputmode="decimal" /></label>
+        <label>Date of birth<input id="date_of_birth" type="date" /></label>
+        <label>Gender<input id="gender" /></label>
+        <label>Nationality<input id="nationality" /></label>
+        <label>Address<input id="address" autocomplete="street-address" /></label>
+        <label>City<input id="city" autocomplete="address-level2" /></label>
+        <label>State<input id="state" autocomplete="address-level1" /></label>
+        <label>Country<input id="country" autocomplete="country-name" /></label>
+        <label>PIN / Postal code<input id="postal_code" autocomplete="postal-code" /></label>
         <label>Current location<input id="current_location" /></label>
-        <label>Earliest joining date<input id="joining_date" type="date" /></label>
       </div>
     </section>
 
     <section class="panel">
-      <h2>Preferences & links</h2>
+      <h2>Education</h2>
+      <div class="form-grid">
+        <label>College / University<input id="college" /></label>
+        <label>Degree<input id="degree" placeholder="B.Tech" /></label>
+        <label>Stream / Branch<input id="stream" placeholder="CSE (AI & ML)" /></label>
+        <label>Passing year<input id="passing_year" inputmode="numeric" /></label>
+        <label>Current semester<input id="semester" inputmode="numeric" /></label>
+        <label>CGPA / GPA<input id="cgpa" inputmode="decimal" /></label>
+        <label>Class X percentage<input id="class_x_percentage" inputmode="decimal" /></label>
+        <label>Class X board<input id="class_x_board" /></label>
+        <label>Class X passing year<input id="class_x_year" inputmode="numeric" /></label>
+        <label>Class XII percentage<input id="class_xii_percentage" inputmode="decimal" /></label>
+        <label>Class XII board<input id="class_xii_board" /></label>
+        <label>Class XII passing year<input id="class_xii_year" inputmode="numeric" /></label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Job preferences & links</h2>
       <div class="form-grid">
         <label>Preferred city / work location<input id="preferred_city" /></label>
+        <label>Earliest joining date<input id="joining_date" type="date" /></label>
+        <label>Notice period<input id="notice_period" placeholder="Immediate / 30 days" /></label>
         <label>GitHub<input id="github" placeholder="https://github.com/..." /></label>
         <label>LinkedIn<input id="linkedin" placeholder="https://www.linkedin.com/in/..." /></label>
+        <label>Portfolio / personal website<input id="portfolio" placeholder="https://..." /></label>
       </div>
       <label class="wide">Skills (comma separated)
         <textarea id="skills" rows="3" placeholder="Python, FastAPI, React, robotics..."></textarea>
       </label>
       <label class="wide">Projects / experience notes
-        <textarea id="projects" rows="7" placeholder="Add concise facts the AI may use for application answers. Do not add anything you cannot verify."></textarea>
+        <textarea id="projects" rows="7" placeholder="Add concise verified facts the AI may use when drafting application answers."></textarea>
+      </label>
+    </section>
+
+    <section class="panel">
+      <h2>Reusable answers</h2>
+      <p>For recurring questions not covered above, save equivalent question wordings once. Format each line as <strong>wording 1 / wording 2 = answer</strong>. FiFo will reuse it only when the match is strong. Sensitive declarations still require review.</p>
+      <label class="wide">Answer bank
+        <textarea id="answer_bank" rows="8" placeholder="Current semester / semester = 7&#10;University roll number / enrollment number = YOUR_VALUE&#10;Preferred work mode / work arrangement = Hybrid"></textarea>
       </label>
     </section>
 
     <section class="panel">
       <h2>Resume import</h2>
-      <p>PDF import currently extracts only conservative contact suggestions. It never overwrites your saved profile automatically.</p>
+      <p>PDF import currently extracts conservative contact suggestions. It never overwrites your saved profile automatically.</p>
       <input id="resume" type="file" accept="application/pdf" />
       <button id="importResume" class="secondary">Inspect resume</button>
       <pre id="resumeResult" class="result hidden"></pre>
