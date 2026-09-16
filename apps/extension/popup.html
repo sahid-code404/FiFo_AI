@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FiFo AI</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <main class="shell">
+    <div class="brand-row">
+      <div class="logo">F</div>
+      <div>
+        <h1>FiFo AI</h1>
+        <p>Application autofill assistant</p>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="status-row">
+        <span>API</span>
+        <span id="apiStatus" class="pill muted">Checking…</span>
+      </div>
+      <button id="analyzeButton" class="primary">Analyze & Fill This Form</button>
+      <button id="profileButton" class="secondary">Edit My Profile</button>
+    </section>
+
+    <section id="resultCard" class="card hidden">
+      <h2>Form summary</h2>
+      <div class="grid">
+        <div><strong id="filledCount">0</strong><span>Filled</span></div>
+        <div><strong id="reviewCount">0</strong><span>Review</span></div>
+        <div><strong id="missingCount">0</strong><span>Missing</span></div>
+        <div><strong id="unknownCount">0</strong><span>Unknown</span></div>
+      </div>
+      <p id="message" class="message"></p>
+    </section>
+
+    <p class="fineprint">FiFo AI never submits a form automatically. Review all answers before submitting.</p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
