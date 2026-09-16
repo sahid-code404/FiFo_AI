@@ -27,12 +27,34 @@ apps/
 
 ```bash
 cd apps/api
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 cp .env.example .env
-uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8000
 ```
+
+Using `python -m pip` and `python -m uvicorn` ensures the commands come from the active virtual environment instead of Fedora system packages.
+
+### Fedora / Python 3.15 note
+
+FiFo AI intentionally uses base `uvicorn` instead of `uvicorn[standard]`. The optional standard extras include native packages such as `httptools` and `uvloop`; on very new Python versions they may try to compile locally and require Python development headers. They are not required for FiFo AI development.
+
+If an earlier installation failed, recreate the virtual environment before retrying:
+
+```bash
+cd apps/api
+deactivate 2>/dev/null || true
+rm -rf .venv
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+Do not install Fedora's `python3-uvicorn` for this project. The project should run entirely from `.venv`.
 
 ### Browser extension
 
