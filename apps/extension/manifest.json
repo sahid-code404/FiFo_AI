@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "FiFo AI",
   "description": "AI-assisted job and application form autofill with review-first safety.",
-  "version": "0.2.0",
-  "permissions": ["storage", "activeTab", "tabs"],
+  "version": "0.3.0",
+  "permissions": ["storage", "activeTab", "tabs", "webNavigation"],
   "host_permissions": [
     "http://localhost:8000/*"
   ],
@@ -21,7 +21,8 @@
       "exclude_matches": ["http://localhost:8000/*"],
       "js": ["content.js"],
       "run_at": "document_idle",
-      "all_frames": false
+      "all_frames": true,
+      "match_about_blank": true
     }
   ]
 }
