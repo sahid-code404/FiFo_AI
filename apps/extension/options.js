@@ -10,6 +10,7 @@ const factFields = [
 ];
 const preferenceFields = ["preferred_city", "work_mode"];
 const linkFields = ["github", "linkedin", "portfolio"];
+const aiKnowledgeFields = ["projects", "experience", "achievements", "career_goals", "resume_text"];
 
 function byId(id) {
   return document.getElementById(id);
@@ -68,7 +69,7 @@ function fillProfile(profile) {
   preferenceFields.forEach((field) => setValue(field, preferences[field] ?? profile[field]));
   linkFields.forEach((field) => setValue(field, links[field] ?? profile[field]));
   setValue("skills", (profile.skills || []).join(", "));
-  setValue("projects", profile.projects || "");
+  aiKnowledgeFields.forEach((field) => setValue(field, profile[field] || ""));
   setValue("answer_bank", answerBankToText(profile.answer_bank));
 }
 
@@ -77,12 +78,20 @@ function collectProfile(existing = {}) {
   const preferences = Object.fromEntries(preferenceFields.map((field) => [field, byId(field)?.value.trim() || ""]));
   const links = Object.fromEntries(linkFields.map((field) => [field, byId(field)?.value.trim() || ""]));
   const skills = byId("skills").value.split(",").map((item) => item.trim()).filter(Boolean);
-  const projects = byId("projects").value.trim();
   const answer_bank = parseAnswerBank(byId("answer_bank").value);
+  const aiKnowledge = Object.fromEntries(
+    aiKnowledgeFields.map((field) => [field, byId(field)?.value.trim() || ""])
+  );
 
-  // Preserve future/unknown top-level keys so upgrading the extension does not
-  // accidentally erase data created by newer API versions.
-  return { ...existing, facts, preferences, links, skills, projects, answer_bank };
+  return {
+    ...existing,
+    facts,
+    preferences,
+    links,
+    skills,
+    answer_bank,
+    ...aiKnowledge,
+  };
 }
 
 let loadedProfile = {};
@@ -94,7 +103,14 @@ async function load() {
   try {
     loadedProfile = await api("/profile") || {};
     fillProfile(loadedProfile);
-    byId("connectionStatus").textContent = "Connected";
+    const health = await api("/health").catch(() => null);
+    if (health?.ai_provider === "gemini") {
+      byId("connectionStatus").textContent = `Connected · Gemini ${health.ai_model || ""}`.trim();
+    } else if (health?.ai_provider === "openai_compatible") {
+      byId("connectionStatus").textContent = `Connected · AI ${health.ai_model || ""}`.trim();
+    } else {
+      byId("connectionStatus").textContent = "Connected · AI not configured";
+    }
   } catch (error) {
     byId("connectionStatus").textContent = `Offline: ${error.message}`;
   }
@@ -105,8 +121,9 @@ byId("saveConnection").addEventListener("click", async () => {
   await chrome.storage.sync.set({ apiUrl });
   byId("connectionStatus").textContent = "Connection saved";
   try {
-    await api("/health");
-    byId("connectionStatus").textContent = "Connected";
+    const health = await api("/health");
+    const ai = health?.ai_provider === "gemini" ? ` · Gemini ${health.ai_model || ""}` : "";
+    byId("connectionStatus").textContent = `Connected${ai}`.trim();
   } catch (error) {
     byId("connectionStatus").textContent = `Saved, but API is offline: ${error.message}`;
   }
@@ -142,10 +159,18 @@ byId("importResume").addEventListener("click", async () => {
 
   try {
     const result = await api("/profile/import-resume", { method: "POST", body: form });
-    output.textContent = JSON.stringify(result, null, 2);
+    const summary = {
+      filename: result.filename,
+      characters: result.characters,
+      suggestions: result.suggestions,
+      resume_text_loaded: Boolean(result.resume_text),
+      note: result.note,
+    };
+    output.textContent = JSON.stringify(summary, null, 2);
 
     if (result.suggestions?.email && !byId("email").value) setValue("email", result.suggestions.email);
     if (result.suggestions?.phone && !byId("phone").value) setValue("phone", result.suggestions.phone);
+    if (result.resume_text) setValue("resume_text", result.resume_text);
   } catch (error) {
     output.textContent = `Import failed: ${error.message}`;
   }
