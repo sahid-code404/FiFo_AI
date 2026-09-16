@@ -6,9 +6,9 @@ const factFields = [
   "college", "degree", "stream", "passing_year", "semester", "cgpa",
   "class_x_percentage", "class_x_board", "class_x_year",
   "class_xii_percentage", "class_xii_board", "class_xii_year",
-  "joining_date", "notice_period"
+  "current_employer", "current_job_title", "years_experience", "joining_date", "notice_period"
 ];
-const preferenceFields = ["preferred_city"];
+const preferenceFields = ["preferred_city", "work_mode"];
 const linkFields = ["github", "linkedin", "portfolio"];
 
 function byId(id) {
