@@ -51,6 +51,10 @@ ALIASES: dict[str, list[str]] = {
         "batch", "batch year", "graduation batch", "degree completion year", "completion year",
     ],
     "semester": ["semester", "current semester", "sem", "present semester"],
+    "academic_year": [
+        "academic year", "current academic year", "year of study", "current year of study",
+        "study year", "college year", "university year", "year level", "current year level",
+    ],
     "cgpa": [
         "cgpa", "graduation cgpa", "cgpa graduation", "current cgpa", "overall cgpa",
         "cumulative cgpa", "gpa", "current gpa", "cumulative gpa", "overall gpa",
@@ -78,6 +82,17 @@ ALIASES: dict[str, list[str]] = {
         "preferred city", "preferred location", "preferred city market of work", "preferred work location",
         "preferred job location", "job location preference", "location preference", "preferred posting location",
         "preferred base location",
+    ],
+    "preferred_track": [
+        "preferred role", "preferred internship role", "preferred internship track", "internship track",
+        "internship role", "job track", "career track", "role applying for", "position applying for",
+        "which internship track are you applying for", "which role are you applying for",
+        "desired role", "desired position",
+    ],
+    "proficiency_level": [
+        "proficiency", "proficiency level", "skill level", "technical proficiency",
+        "programming proficiency", "tools proficiency", "primary tools proficiency",
+        "rate your proficiency", "self rated proficiency", "self rating",
     ],
     "joining_date": [
         "joining date", "earliest joining date", "earliest available joining date", "availability date",
@@ -129,6 +144,7 @@ NEGATIVE_TERMS: dict[str, set[str]] = {
     "cgpa": {"10th", "12th", "class x", "class xii", "ssc", "hsc"},
     "current_employer": {"desired", "preferred", "target"},
     "current_job_title": {"desired", "preferred", "target"},
+    "preferred_track": {"current employer", "current company", "current designation", "current job title"},
 }
 
 # These categories must always be reviewed even if the profile later contains a
@@ -195,6 +211,10 @@ def get_value(profile: dict[str, Any], key: str) -> Any:
         value = _raw_value(profile, "current_location")
     if value in (None, "") and key == "current_location":
         value = _raw_value(profile, "city")
+
+    # Combined profile-link questions often accept any one of these.
+    if value in (None, "") and key == "portfolio":
+        value = _raw_value(profile, "github") or _raw_value(profile, "linkedin")
 
     if isinstance(value, list):
         return ", ".join(str(item) for item in value if str(item).strip())
